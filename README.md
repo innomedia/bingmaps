@@ -20,15 +20,15 @@ and enter it inside the SiteConfig of your page.
     //$loadOnStartClass - In case you want to wait for pageLoad to reduce initial page Loading times then afterwards enable Scriptblock via JS
     //$Debug - true disables minification/removing redundant spaces and new line characters
     $map = bingMap\Map::create() // 
-        ->SetPosition(Coordinates::GetCoordinates($Latitute,$Longitude)) //Optional if you just want to display a map without pins to center maps at Coordinates
+        ->SetPosition(bingMap\Coordinates::GetCoordinates($Latitute,$Longitude)) //Optional if you just want to display a map without pins to center maps at Coordinates
         ->SetStyle("width:100%;height:400px;position:relative;") //Required CSS-Style of the container of the map
         ->SetIcon($IconURL)// Renders Icon with Url from Web (might not work localy) (Priority 1)
         ->SetBase64Icon($Icon)// Renders Icon with Base64 StringFormat "data:image/png;base64,$base64Data" adapt image/png to your needs (Priority 2)
         ->SetCenterOnPins(false) //Optional default true - adds Script that centers Map so all Pins are visible
         ->SetCenterOnPinsPadding(40) //Optional default 50 - adds Padding to pin centering map
         ;
-    $Marker = Marker::create($ID) //$ID - Some Number must be unique to
-            ->SetPosition(Coordinates::GetCoordinatesFromAddress("Westendstraße 20 77971 Kippenheim"))
+    $Marker = bingMap\Marker::create($ID) //$ID - Some Number must be unique to
+            ->SetPosition(bingMap\Coordinates::GetCoordinatesFromAddress("Westendstraße 20 77971 Kippenheim"))
             ->SetIconURL($IconURL) // Sets IconURL (Priority: 1)
             ->SetBase64Icon($Base64String) // String format same as above (Priority: 2)
             ->SetIconVariable() // Has no parameters simply sets the default IconVariable if you just need 1 Icon for all Markers (Priority: 3)
@@ -36,7 +36,7 @@ and enter it inside the SiteConfig of your page.
             ;
     $map->AddMarker($Marker);
 
-    $Tooltip = InfoBox::create()
+    $Tooltip = bingMap\InfoBox::create()
     ->SetTitle("Title") // Sets Title of InfoBox
     ->SetDescription("Some Text") // (Semi-Optional) Sets Description of default InfoBox
     ->SetHTMLContent($HTML) // (Semi-Optional) In case you want to use a Custom InfoBox in this case add your own HTMLInfoBox.ss template adapt original one in Module
