@@ -2,6 +2,7 @@
     "name":"innomedia/bingmaps",
     "description": "Silverstripe 4 Bing Maps Implementation",
     "license": "BSD-3-Clause",
+    "version": "0.1",
     "authors": [
       {
         "name":"Innomedia AG",
