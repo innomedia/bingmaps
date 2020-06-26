@@ -27,7 +27,7 @@ and enter it inside the SiteConfig of your page.
         ->SetCenterOnPins(false) //Optional default true - adds Script that centers Map so all Pins are visible
         ->SetCenterOnPinsPadding(40) //Optional default 50 - adds Padding to pin centering map
         ;
-    $Marker = bingMap\Marker::create($ID) //$ID - Some Number must be unique to
+    $Marker = bingMap\Marker::create($ID) //$ID - Some Number must be unique for all Markers
             ->SetPosition(bingMap\Coordinates::GetCoordinatesFromAddress("Westendstraße 20 77971 Kippenheim"))
             ->SetIconURL($IconURL) // Sets IconURL (Priority: 1)
             ->SetBase64Icon($Base64String) // String format same as above (Priority: 2)
