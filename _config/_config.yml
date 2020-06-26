@@ -1,0 +1,6 @@
+---
+Name: BingMapsConfig
+---
+SilverStripe\SiteConfig\SiteConfig:
+  extensions:
+    - bingMap\SiteConfigExtension
