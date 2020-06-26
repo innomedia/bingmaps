@@ -5,7 +5,7 @@ This module provides bing map functionality
 ## Installation
 
 ```bash
-    composer require innomedia/bingmaps "master"
+composer require innomedia/bingmaps "0.1"
 ``` 
 ## Configuration
 
