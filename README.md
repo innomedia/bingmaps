@@ -31,7 +31,7 @@ and enter it inside the SiteConfig of your page.
             ->SetPosition(bingMap\Coordinates::GetCoordinatesFromAddress("Westendstraße 20 77971 Kippenheim"))
             ->SetIconURL($IconURL) // Sets IconURL (Priority: 1)
             ->SetBase64Icon($Base64String) // String format same as above (Priority: 2)
-            ->SetIconVariable() // Has no parameters simply sets the default IconVariable if you just need 1 Icon for all Markers (Priority: 3)
+            ->SetIconVariable() // Has no parameters simply sets the default IconVariable if you just need 1 Icon for all Markers (requires Icon to be set in map) (Priority: 3)
             ->SetInfoBox($Tooltip) // For setting a tooltip to open upon click (initilization below (needs to be above in reality))
             ;
     $map->AddMarker($Marker);
