@@ -18,6 +18,7 @@ class Map extends ViewableData
     private bool $CenterOnPins = true;
     private int $Padding = 50;
     private $Markers = [];
+    private ?int $Zoom = null;
 
     public function __construct(string $ID = "1", string $loadOnStartClass = "", $Debug = false)
     {
@@ -32,6 +33,11 @@ class Map extends ViewableData
     public function SetCenterOnPins(bool $value)
     {
         $this->CenterOnPins = $value;
+        return $this;
+    }
+    public function SetZoom(int $value)
+    {
+        $this->Zoom = $value;
         return $this;
     }
     public function SetIcon(string $IconPath)
@@ -132,6 +138,15 @@ class Map extends ViewableData
         return "";
     }
 
+    public function RenderZoom()
+    {
+        if($this->Zoom != null)
+        {
+            return ",zoom: ".$this->Zoom;
+        }
+        return "";
+    }
+
     public function RenderFunction()
     {
         $rendered = "";
@@ -145,7 +160,7 @@ class Map extends ViewableData
         $mapVariable = "map" . $this->ID;
 
         $rendered .= "
-            var $mapVariable = new Microsoft.Maps.Map('#MapContainer{$this->ID}',{center:{$this->RenderLocation()}});\n
+            var $mapVariable = new Microsoft.Maps.Map('#MapContainer{$this->ID}',{center:{$this->RenderLocation()} {$this->RenderZoom()}});\n
         ";
         $rendered .= $this->RenderIcon();
 
