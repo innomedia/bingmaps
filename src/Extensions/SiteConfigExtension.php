@@ -2,18 +2,14 @@
 
 namespace bingMap;
 
-use SilverStripe\Forms\FieldList;
-use SilverStripe\Forms\TextField;
-use SilverStripe\ORM\DataExtension;
-
-class SiteConfigExtension extends DataExtension
+class SiteConfigExtension extends  \DataExtension
 {
-    private static $db = [
+    private static $db = array(
         "bingAPIKey"    =>  'Text'
-    ];
+    );
 
-    public function updateCMSFields(FieldList $fields)
+    public function updateCMSFields(\FieldList $fields)
     {
-        $fields->addFieldToTab('Root.Bing',TextField::create('bingAPIKey','Bing API Schlüssel'));
+        $fields->addFieldToTab('Root.Bing',\TextField::create('bingAPIKey','Bing API Schlüssel'));
     }
 }
