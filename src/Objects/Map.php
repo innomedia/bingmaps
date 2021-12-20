@@ -172,9 +172,8 @@ class Map extends ViewableData
         //Remember to
         if($this->MouseWheelZoom != null)
         {
-            $options["disableScrollWheelZoom"] = "true";
+            $optionsarray["disableScrollWheelZoom"] = "true";
         }
-
         $options = "";
         foreach($optionsarray as $key => $value)
         {
@@ -184,9 +183,8 @@ class Map extends ViewableData
         if($options != "")
         {
             $options = substr($options,0,-1);
-            $script .= $mapVariable."->setOptions({$options});\n";
+            $script .= $mapVariable.".setOptions({{$options}});\n";
         }
-        
         return $script;
     }
 
