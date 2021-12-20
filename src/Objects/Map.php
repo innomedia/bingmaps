@@ -21,6 +21,7 @@ class Map extends ViewableData
     private $Padding = 50;
     private $Markers = [];
     private $Zoom = null;
+    private $MouseWheelZoom = null;
 
     public function __construct($ID = "1", $loadOnStartClass = "", $Debug = false)
     {
@@ -41,6 +42,10 @@ class Map extends ViewableData
     {
         $this->Zoom = $value;
         return $this;
+    }
+    public function DisableMouseWheelZoom()
+    {
+        $this->MouseWheelZoom = true;
     }
     public function SetIcon($IconPath)
     {
@@ -159,6 +164,32 @@ class Map extends ViewableData
         return "";
     }
 
+    public function RenderOptions($mapVariable)
+    {
+        $script = "";
+
+        $optionsarray = [];
+        //Remember to
+        if($this->MouseWheelZoom != null)
+        {
+            $options["disableScrollWheelZoom"] = "true";
+        }
+
+        $options = "";
+        foreach($optionsarray as $key => $value)
+        {
+            $options .= $key.": ".$value.",";
+        }
+
+        if($options != "")
+        {
+            $options = substr($options,0,-1);
+            $script .= $mapVariable."->setOptions({$options});\n";
+        }
+        
+        return $script;
+    }
+
     public function RenderFunction()
     {
         $rendered = "";
@@ -174,6 +205,7 @@ class Map extends ViewableData
         $rendered .= "
             var $mapVariable = new Microsoft.Maps.Map('#MapContainer{$this->ID}',{center:{$this->RenderLocation()} {$this->RenderZoom()}});\n
         ";
+        $rendered .= $this->RenderOptions($mapVariable);
         $rendered .= $this->RenderIcon();
 
         $rendered .= $this->RenderMarkers($mapVariable);
