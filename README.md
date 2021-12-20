@@ -46,6 +46,8 @@ and enter it inside the SiteConfig of your page.
     ;
     Coordinates::GetCoordinates($Latitude,$Longitude); // creates a Coordinates object with both values
     Coordinates::GetCoordinatesFromAddress(/*string*/ $Address); // creates a Coordinates object after querying Bing for Lat/Lng from Address
+*as of 0.2.2
+    $map->DisableMouseWheelZoom(); will disable mouswheel zooming
 
     return $map; // return Map object to Template remember to use $MapVariable.RAW in Template
 
