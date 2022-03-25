@@ -27,6 +27,10 @@ and enter it inside the SiteConfig of your page.
         ->SetCenterOnPins(false) //Optional default true - adds Script that centers Map so all Pins are visible
         ->SetCenterOnPinsPadding(40) //Optional default 50 - adds Padding to pin centering map (only works without SetCenterOnPins(false))
         ->SetZoom(5) //use With SetCenterOnPins(false)
+        ->SetDarkMapType() //Sets Dark Theme
+        ->SetLightMapType() //Sets Light Theme (Default?)
+        ->SetGrayscaleMapType()  //Sets Grayscale Theme
+        ->SetMapType(MapType) //  //Sets MapType Theme in case bing adds new themes
         ;
     $Marker = bingMap\Marker::create($ID) //$ID - Some Number must be unique for all Markers
             ->SetPosition(bingMap\Coordinates::GetCoordinatesFromAddress("Teststreet 39 AreaCode AreaName"))
