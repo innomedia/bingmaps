@@ -22,6 +22,7 @@ class Map extends ViewableData
     private $Markers = [];
     private $Zoom = null;
     private $MouseWheelZoom = null;
+    private $MapType = null;
 
     public function __construct($ID = "1", $loadOnStartClass = "", $Debug = false)
     {
@@ -33,7 +34,7 @@ class Map extends ViewableData
     {
         return new Map($ID, $loadOnStartClass, $Debug);
     }
-    public function SetCenterOnPins( $value)
+    public function SetCenterOnPins($value)
     {
         $this->CenterOnPins = $value;
         return $this;
@@ -62,7 +63,7 @@ class Map extends ViewableData
         $this->Base64Icon = $Base64;
         return $this;
     }
-    public function SetStyle( $style)
+    public function SetStyle($style)
     {
         $this->Style = $style;
         return $this;
@@ -76,6 +77,25 @@ class Map extends ViewableData
     {
         $this->Width = $pixel;
         return $this;
+    }
+    //When Bing adds new Types not covered by Set[Type]Type Methods
+    public function SetMapType($Type)
+    {
+        $this->MapType = $Type;
+        return $this;
+    }
+    public function SetDarkMapType()
+    {
+        return $this->SetMapType("Microsoft.Maps.MapTypeId.canvasDark");
+    }
+    //Default when nothing is set
+    public function SetLightMapType()
+    {
+        return $this->SetMapType("Microsoft.Maps.MapTypeId.canvasLight");
+    }
+    public function SetGrayscaleMapType()
+    {
+        return $this->SetMapType("Microsoft.Maps.MapTypeId.grayscale");
     }
     public function HasLoadOnStartClass()
     {
@@ -157,11 +177,19 @@ class Map extends ViewableData
 
     public function RenderZoom()
     {
-        if($this->Zoom != null)
-        {
-            return ",zoom: ".$this->Zoom;
+        if ($this->Zoom != null) {
+            return ",zoom: " . $this->Zoom;
         }
         return "";
+    }
+    public function RenderMapTypeID()
+    {
+        if($this->MapType != null && $this->MapType != "")
+        {
+            return ",mapTypeId: ".$this->MapType;
+        }
+        return "";
+        
     }
 
     public function RenderOptions($mapVariable)
@@ -170,20 +198,17 @@ class Map extends ViewableData
 
         $optionsarray = [];
         //Remember to
-        if($this->MouseWheelZoom != null)
-        {
+        if ($this->MouseWheelZoom != null) {
             $optionsarray["disableScrollWheelZoom"] = "true";
         }
         $options = "";
-        foreach($optionsarray as $key => $value)
-        {
-            $options .= $key.": ".$value.",";
+        foreach ($optionsarray as $key => $value) {
+            $options .= $key . ": " . $value . ",";
         }
 
-        if($options != "")
-        {
-            $options = substr($options,0,-1);
-            $script .= $mapVariable.".setOptions({{$options}});\n";
+        if ($options != "") {
+            $options = substr($options, 0, -1);
+            $script .= $mapVariable . ".setOptions({{$options}});\n";
         }
         return $script;
     }
@@ -201,7 +226,7 @@ class Map extends ViewableData
         $mapVariable = "map" . $this->ID;
 
         $rendered .= "
-            var $mapVariable = new Microsoft.Maps.Map('#MapContainer{$this->ID}',{center:{$this->RenderLocation()} {$this->RenderZoom()}});\n
+            var $mapVariable = new Microsoft.Maps.Map('#MapContainer{$this->ID}',{center:{$this->RenderLocation()} {$this->RenderZoom()} {$this->RenderMapTypeID()}});\n
         ";
         $rendered .= $this->RenderOptions($mapVariable);
         $rendered .= $this->RenderIcon();
@@ -220,13 +245,12 @@ class Map extends ViewableData
 
         return $rendered;
     }
-    
+
     private function GetMarkersData()
     {
         $MarkersData = [];
         $iconPath = $this->IconPath;
-        foreach($this->Markers as $Marker)
-        {
+        foreach ($this->Markers as $Marker) {
             $MarkersData[] = $Marker->GetReactData($iconPath);
         }
         return $MarkersData;
@@ -235,12 +259,12 @@ class Map extends ViewableData
     {
         $data = [
             "key" => $this->ID,
-            "loadOnStartClass"  =>  $this->loadOnStartClass,
-            "centerOnPins"  =>  $this->CenterOnPins,
-            "padding"   =>  $this->Padding,
-            "markers"   => $this->GetMarkersData(),
-            "zoom"  =>  $this->Zoom,
-            "position"  =>  $this->Coords->GetReactData(),
+            "loadOnStartClass" => $this->loadOnStartClass,
+            "centerOnPins" => $this->CenterOnPins,
+            "padding" => $this->Padding,
+            "markers" => $this->GetMarkersData(),
+            "zoom" => $this->Zoom,
+            "position" => $this->Coords->GetReactData(),
         ];
         return $data;
     }
