@@ -31,6 +31,7 @@ and enter it inside the SiteConfig of your page.
         ->SetLightMapType() //Sets Light Theme (Default?)
         ->SetGrayscaleMapType()  //Sets Grayscale Theme
         ->SetMapType(MapType) //  //Sets MapType Theme in case bing adds new themes
+        ->setClusterLayer(true) // enables Clusting does nor really work with custom pin icons cluster icons and custom icons are both loaded
         ;
     $Marker = bingMap\Marker::create($ID) //$ID - Some Number must be unique for all Markers
             ->SetPosition(bingMap\Coordinates::GetCoordinatesFromAddress("Teststreet 39 AreaCode AreaName"))
