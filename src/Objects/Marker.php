@@ -68,7 +68,7 @@ class Marker
         }
         return "";
     }
-    public function Render($mapVariable)
+    public function Render($mapVariable,$ClusterEnabled)
     {
         if ($this->InfoBox != null && !$this->InfoBox->HasPosition()) {
             $this->InfoBox->SetPosition($this->GetPosition());
@@ -79,8 +79,34 @@ class Marker
         if ($this->InfoBox != null) {
             $rendered .= $this->InfoBox->Render($mapVariable, "pushpin$this->ID");
         }
-        $rendered .= "{$mapVariable}.entities.push(pushpin$this->ID);\n";
+        if(!$ClusterEnabled)
+        {
+            $rendered .= "{$mapVariable}.entities.push(pushpin$this->ID);\n";
+        }
+        
         return $rendered;
+    }
+    public function RenderClusterMarker($mapVariable)
+    {
+        $data = [];
+
+        if ($this->InfoBox != null && !$this->InfoBox->HasPosition()) {
+            $this->InfoBox->SetPosition($this->GetPosition());
+        }
+        $rendered = "";
+        $rendered .= $this->RenderLocationVariable($this->ID, self::$Suffix) . "\n";
+        $rendered .= "var pushpin$this->ID = new Microsoft.Maps.Pushpin({$this->GetLocationVariable($this->ID, self::$Suffix)},{$this->RenderIcon()});\n";
+        if ($this->InfoBox != null) {
+            $rendered .= $this->InfoBox->Render($mapVariable, "pushpin$this->ID");
+        }
+        if(!$ClusterEnabled)
+        {
+            $rendered .= "{$mapVariable}.entities.push(pushpin$this->ID);\n";
+        }
+        $data["rendered"] = $rendered;
+        $data["pushpinvariable"] = "pushpin$this->ID";
+
+        return $data;
     }
     private function GetInfoBoxData()
     {

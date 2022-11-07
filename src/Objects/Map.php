@@ -28,6 +28,7 @@ class Map extends ViewableData
     public function __construct($ID = "1", $loadOnStartClass = "", $Debug = false)
     {
         $this->Debug = $Debug;
+        $this->Debug = true;
         $this->loadOnStartClass = $loadOnStartClass;
         $this->ID = $ID;
     }
@@ -135,17 +136,20 @@ class Map extends ViewableData
     private function RenderMarkers($mapVariable)
     {
         $rendered = "";
-        if ($this->CenterOnPins == true) {
+        if ($this->CenterOnPins == true || $this->ClusterLayer == true) {
             $rendered .= "var locs = [];\n";
         }
         for ($i = 0; $i < count($this->Markers); $i++) {
-            $rendered .= $this->Markers[$i]->Render($mapVariable);
-            if ($this->CenterOnPins == true) {
-                $loc = $this->Markers[$i]->RenderLocation();
-                $rendered .= "locs.push($loc);\n";
+            if($this->ClusterLayer == false)
+            {
+                $rendered .= $this->Markers[$i]->Render($mapVariable,$this->ClusterLayer);
+                if ($this->CenterOnPins == true) {
+                    $loc = $this->Markers[$i]->RenderLocation();
+                    $rendered .= "locs.push($loc);\n";
+                }
             }
+            
         }
-
         return $rendered;
     }
     private function RenderInfoBoxCloser()
@@ -171,10 +175,21 @@ class Map extends ViewableData
     private function RenderClusterLayer($mapVariable)
     {
         if ($this->ClusterLayer == true) {
-            return "Microsoft.Maps.loadModule('Microsoft.Maps.Clustering',function () {
+
+            $rendered = "";
+            for ($i = 0; $i < count($this->Markers); $i++) {
+                $output = $this->Markers[$i]->RenderClusterMarker($mapVariable);
+                $rendered .= $output["rendered"];
+                $loc = $output["pushpinvariable"];
+                $rendered .= "locs.push($loc);\n";
+                
+            }
+
+            $rendered .= "Microsoft.Maps.loadModule('Microsoft.Maps.Clustering',function () {
                 clusterLayer = new Microsoft.Maps.ClusterLayer(locs);
                 {$mapVariable}.layers.insert(clusterLayer);
             });\n";
+            return $rendered;
         }
         return "";
     }
