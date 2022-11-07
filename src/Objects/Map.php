@@ -23,6 +23,7 @@ class Map extends ViewableData
     private $Zoom = null;
     private $MouseWheelZoom = null;
     private $MapType = null;
+    private $ClusterLayer = false;
 
     public function __construct($ID = "1", $loadOnStartClass = "", $Debug = false)
     {
@@ -38,6 +39,10 @@ class Map extends ViewableData
     {
         $this->CenterOnPins = $value;
         return $this;
+    }
+    public function setClusterLayer($value)
+    {
+        $this->ClusterLayer = $value;
     }
     public function SetZoom($value)
     {
@@ -162,6 +167,16 @@ class Map extends ViewableData
         }
         return "";
     }
+    private function RenderClusterLayer($mapVariable)
+    {
+        if ($this->ClusterLayer == true) {
+            return "Microsoft.Maps.loadModule('Microsoft.Maps.Clustering',function () {
+                clusterLayer = new Microsoft.Maps.ClusterLayer(locs);
+                {$mapVariable}.layers.insert(clusterLayer);
+            });\n";
+        }
+        return "";
+    }
     private function RenderIcon()
     {
         if ($this->IconPath != null) {
@@ -233,6 +248,7 @@ class Map extends ViewableData
 
         $rendered .= $this->RenderMarkers($mapVariable);
         $rendered .= $this->RenderMapCenteringOnPins($mapVariable);
+        $rendered .= $this->RenderClusterLayer($mapVariable);
 
         $rendered .= "}\n";
         $rendered .= $this->RenderInfoBoxCloser();
