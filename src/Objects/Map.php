@@ -43,6 +43,7 @@ class Map extends ViewableData
     public function setClusterLayer($value)
     {
         $this->ClusterLayer = $value;
+        return $this;
     }
     public function SetZoom($value)
     {
