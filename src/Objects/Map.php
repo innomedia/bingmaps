@@ -24,6 +24,7 @@ class Map extends ViewableData
     private $MouseWheelZoom = null;
     private $MapType = null;
     private $ClusterLayer = false;
+    private $SpatialDataService = false;
 
     public function __construct($ID = "1", $loadOnStartClass = "", $Debug = false)
     {
@@ -44,6 +45,11 @@ class Map extends ViewableData
     public function setClusterLayer($value)
     {
         $this->ClusterLayer = $value;
+        return $this;
+    }
+    public function setSpatialDataService($value)
+    {
+        $this->SpatialDataService = $value;
         return $this;
     }
     public function SetZoom($value)
@@ -193,6 +199,32 @@ class Map extends ViewableData
         }
         return "";
     }
+    private function RenderSpatialDataService($mapVariable)
+    {
+        if ($this->SpatialDataService == true) {
+
+            $rendered = "";
+
+            $rendered .= "var geoDataRequestOptions = {
+                entityType: 'PopulatedPlace'
+            };\n";
+            $rendered .= "Microsoft.Maps.loadModule('Microsoft.Maps.SpatialDataService',function () {
+                Microsoft.Maps.SpatialDataService.GeoDataAPIManager.getBoundary(
+                    {$mapVariable}.getCenter(),
+                    geoDataRequestOptions,
+                    {$mapVariable},
+                    function (data) {
+                        console.log(data);
+                        //Add the polygons to the map.
+                        if (data.results && data.results.length > 0) {
+                            {$mapVariable}.entities.push(data.results[0].Polygons);
+                        }
+                    });
+            });\n";
+            return $rendered;
+        }
+        return "";
+    }
     private function RenderIcon()
     {
         if ($this->IconPath != null) {
@@ -265,6 +297,7 @@ class Map extends ViewableData
         $rendered .= $this->RenderMarkers($mapVariable);
         $rendered .= $this->RenderMapCenteringOnPins($mapVariable);
         $rendered .= $this->RenderClusterLayer($mapVariable);
+        $rendered .= $this->RenderSpatialDataService($mapVariable);
 
         $rendered .= "}\n";
         $rendered .= $this->RenderInfoBoxCloser();
