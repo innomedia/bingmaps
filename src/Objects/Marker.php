@@ -47,6 +47,7 @@ class Marker
     {
         return "pushpin$this->ID";
     }
+    
     private function RenderIcon()
     {
         if ($this->IconPath != null) {
@@ -86,7 +87,7 @@ class Marker
         
         return $rendered;
     }
-    public function RenderClusterMarker($mapVariable)
+    public function RenderClusterMarker($mapVariable,$ClusterEnabled)
     {
         $data = [];
 
