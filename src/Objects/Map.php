@@ -25,6 +25,19 @@ class Map extends ViewableData
     private $MapType = null;
     private $ClusterLayer = false;
     private $SpatialDataService = false;
+    private $SpatialDataServiceType = "PopulatedPlace";
+    /*
+      • AdminDivision1: First administrative level within the country/region level, such as a state or a province.
+  • AdminDivision2: Second administrative level within the country/region level, such as a county.
+  • CountryRegion: Country or region.
+  • Neighborhood: A section of a populated place that is typically well-known, but often with indistinct boundaries.
+  • PopulatedPlace: A concentrated area of human settlement, such as a city, town or village.
+  • Postcode1: The smallest post code category, such as a zip code.
+  • Postcode2: The next largest post code category after Postcode1 that is created by aggregating Postcode1 areas.
+  • Postcode3: The next largest post code category after Postcode2 that is created by aggregating Postcode2 areas.
+  • Postcode4: The next largest post code category after Postcode3 that is created by aggregating Postcode3 areas.
+
+    */
 
     public function __construct($ID = "1", $loadOnStartClass = "", $Debug = false)
     {
@@ -50,6 +63,11 @@ class Map extends ViewableData
     public function setSpatialDataService($value)
     {
         $this->SpatialDataService = $value;
+        return $this;
+    }
+    public function setSpatialDataServiceType($value)
+    {
+        $this->SpatialDataServiceType = $value;
         return $this;
     }
     public function SetZoom($value)
@@ -205,7 +223,7 @@ class Map extends ViewableData
             $rendered = "";
 
             $rendered .= "var geoDataRequestOptions = {
-                entityType: 'PopulatedPlace'
+                entityType: '".$this->SpatialDataServiceType."'
             };\n";
 
             $rendered .= "Microsoft.Maps.loadModule('Microsoft.Maps.SpatialDataService',function () {";
