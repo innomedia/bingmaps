@@ -181,10 +181,9 @@ class Map extends ViewableData
     private function RenderClusterLayer($mapVariable)
     {
         if ($this->ClusterLayer == true) {
-
             $rendered = "";
             for ($i = 0; $i < count($this->Markers); $i++) {
-                $output = $this->Markers[$i]->RenderClusterMarker($mapVariable);
+                $output = $this->Markers[$i]->RenderClusterMarker($mapVariable,true);
                 $rendered .= $output["rendered"];
                 $loc = $output["pushpinvariable"];
                 $rendered .= "locs.push($loc);\n";
@@ -208,19 +207,25 @@ class Map extends ViewableData
             $rendered .= "var geoDataRequestOptions = {
                 entityType: 'PopulatedPlace'
             };\n";
-            $rendered .= "Microsoft.Maps.loadModule('Microsoft.Maps.SpatialDataService',function () {
-                Microsoft.Maps.SpatialDataService.GeoDataAPIManager.getBoundary(
-                    {$mapVariable}.getCenter(),
-                    geoDataRequestOptions,
-                    {$mapVariable},
-                    function (data) {
-                        console.log(data);
-                        //Add the polygons to the map.
-                        if (data.results && data.results.length > 0) {
-                            {$mapVariable}.entities.push(data.results[0].Polygons);
-                        }
-                    });
-            });\n";
+
+            $rendered .= "Microsoft.Maps.loadModule('Microsoft.Maps.SpatialDataService',function () {";
+                $rendered .= "var Locations = [];";
+                for ($i = 0; $i < count($this->Markers); $i++) {
+                    $rendered .= "Microsoft.Maps.SpatialDataService.GeoDataAPIManager.getBoundary(
+                        ".$this->Markers[$i]->RenderLocation().",
+                        geoDataRequestOptions,
+                        {$mapVariable},
+                        function (data) {
+                            //Add the polygons to the map.
+                            if (data.results && data.results.length > 0) {
+                                {$mapVariable}.entities.push(data.results[0].Polygons);
+                            }
+                        });";
+                }
+                /*
+                    
+                */
+            $rendered .="});\n";
             return $rendered;
         }
         return "";
