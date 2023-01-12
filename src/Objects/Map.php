@@ -20,6 +20,7 @@ class Map extends ViewableData
     private $CenterOnPins = true;
     private $Padding = 50;
     private $Markers = [];
+    private $ScriptSettings = [];
     private $Zoom = null;
     private $MouseWheelZoom = null;
     private $MapType = null;
@@ -64,6 +65,14 @@ class Map extends ViewableData
     {
         $this->SpatialDataService = $value;
         return $this;
+    }
+    public function addScriptSetting($key,$value)
+    {
+        $this->ScriptSettings[$key] = $value;   
+    }
+    public function removeScriptSetting($key)
+    {
+        unset($this->ScriptSettings[$key]);
     }
     public function setSpatialDataServiceType($value)
     {
@@ -302,8 +311,16 @@ class Map extends ViewableData
     public function RenderFunction()
     {
         $rendered = "";
+        $Attributes = "";
+        if(count($this->ScriptSettings) > 0)
+        {
+            foreach($this->ScriptSettings as $key => $value)
+            {
+                $Attributes .= $key'="'.$value.'" ';
+            }
+        }
         if ($this->loadOnStartClass != "") {
-            $rendered .= "<script class='$this->loadOnStartClass' type='text/plain'>\n";
+            $rendered .= "<script class='$this->loadOnStartClass' $Attributes type='text/plain'>\n";
         } else {
             $rendered .= "<script type='text/javascript'>\n";
         }
