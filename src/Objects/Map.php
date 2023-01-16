@@ -316,7 +316,7 @@ class Map extends ViewableData
         {
             foreach($this->ScriptSettings as $key => $value)
             {
-                $Attributes .= $key'="'.$value.'" ';
+                $Attributes .= $key.'="'.$value.'" ';
             }
         }
         if ($this->loadOnStartClass != "") {
