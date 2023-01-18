@@ -319,8 +319,8 @@ class Map extends ViewableData
                 $Attributes .= $key.'="'.$value.'" ';
             }
         }
-        if ($this->loadOnStartClass != "") {
-            $rendered .= "<script class='$this->loadOnStartClass' $Attributes type='text/plain'>\n";
+        if ($this->loadOnStartClass != "" || $Attributes != "") {
+            $rendered .= "<script class='$this->loadOnStartClass' $Attributes>\n";
         } else {
             $rendered .= "<script type='text/javascript'>\n";
         }
