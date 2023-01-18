@@ -68,11 +68,13 @@ class Map extends ViewableData
     }
     public function addScriptSetting($key,$value)
     {
-        $this->ScriptSettings[$key] = $value;   
+        $this->ScriptSettings[$key] = $value; 
+        return $this;
     }
     public function removeScriptSetting($key)
     {
         unset($this->ScriptSettings[$key]);
+        return $this;
     }
     public function setSpatialDataServiceType($value)
     {
