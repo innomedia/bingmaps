@@ -27,6 +27,8 @@ class Map extends ViewableData
     private $ClusterLayer = false;
     private $SpatialDataService = false;
     private $SpatialDataServiceType = "PopulatedPlace";
+    private $SpatialDataServicePostalCodes = null;
+    private $PolygoneData = [];
     /*
       • AdminDivision1: First administrative level within the country/region level, such as a state or a province.
   • AdminDivision2: Second administrative level within the country/region level, such as a county.
@@ -79,6 +81,16 @@ class Map extends ViewableData
     public function setSpatialDataServiceType($value)
     {
         $this->SpatialDataServiceType = $value;
+        return $this;
+    }
+    public function setSpatialDataServicePostalCodes($value)
+    {
+        $this->SpatialDataServicePostalCodes = $value;
+        return $this;
+    }
+    public function setPolygoneData($value)
+    {
+        $this->PolygoneData = $value;
         return $this;
     }
     public function SetZoom($value)
@@ -199,7 +211,7 @@ class Map extends ViewableData
     }
     private function RenderMapCenteringOnPins($mapVariable)
     {
-        if ($this->CenterOnPins == true) {
+        if ($this->CenterOnPins == true && count($this->Markers) > 0) {
             return "{$mapVariable}.setView({\n
                 bounds: Microsoft.Maps.LocationRect.fromLocations(locs),\n
                 padding: $this->Padding\n
@@ -227,6 +239,40 @@ class Map extends ViewableData
         }
         return "";
     }
+    private function RenderPolygones($mapVariable){
+        if($this->PolygoneData && $this->PolygoneData !== '' && count($this->PolygoneData) > 0){
+            $rendered = "";
+            for ($i = 0; $i < count($this->PolygoneData); $i++){
+                if($this->PolygoneData[$i] !== ''){
+                    $rendered .= "
+                    var center = {$mapVariable}.getCenter();
+                    var exteriorRing = [
+                    ";
+                        for ($j = 0; $j < count($this->PolygoneData[$i]['Coords']); $j++){
+                            if($this->PolygoneData[$i]['Coords'][$j] &&
+                                $this->PolygoneData[$i]['Coords'][$j] !== '' &&
+                                $this->PolygoneData[$i]['Coords'][$j]->IsValid()){
+                                $rendered .= "new Microsoft.Maps.Location({$this->PolygoneData[$i]['Coords'][$j]->GetLatitude()}, {$this->PolygoneData[$i]['Coords'][$j]->GetLongitude()}),
+                            ";
+                            }
+                        }
+                        $rendered .= "
+                    ];
+                    
+                    var polygon{$i} = new Microsoft.Maps.Polygon(exteriorRing, {
+                        fillColor: '{$this->PolygoneData[$i]['Colors']['Background']}',
+                        strokeColor: '{$this->PolygoneData[$i]['Colors']['Stroke']}',
+                        strokeThinkness: 2
+                    });
+                    
+                    {$mapVariable}.entities.push(polygon{$i});
+                    ";
+                }
+            }
+            return $rendered;
+        }
+        return "";
+    }
     private function RenderSpatialDataService($mapVariable)
     {
         if ($this->SpatialDataService == true) {
@@ -234,14 +280,23 @@ class Map extends ViewableData
             $rendered = "";
 
             $rendered .= "var geoDataRequestOptions = {
-                entityType: '".$this->SpatialDataServiceType."'
+                entityType: '".$this->SpatialDataServiceType."',
+                getAllPolygons: true
             };\n";
+
+            if($this->SpatialDataServicePostalCodes !== null) {
+                $rendered .= "var polygonStyle = {
+                    fillColor: 'rgba(13, 66, 104, 1)',
+                    strokeColor: '#fff',
+                    strokeThickness: 1
+                };\n";
+            }
 
             $rendered .= "Microsoft.Maps.loadModule('Microsoft.Maps.SpatialDataService',function () {";
                 $rendered .= "var Locations = [];";
-                for ($i = 0; $i < count($this->Markers); $i++) {
+                if($this->SpatialDataServicePostalCodes !== null){
                     $rendered .= "Microsoft.Maps.SpatialDataService.GeoDataAPIManager.getBoundary(
-                        ".$this->Markers[$i]->RenderLocation().",
+                        ".$this->SpatialDataServicePostalCodes.",
                         geoDataRequestOptions,
                         {$mapVariable},
                         function (data) {
@@ -249,7 +304,20 @@ class Map extends ViewableData
                             if (data.results && data.results.length > 0) {
                                 {$mapVariable}.entities.push(data.results[0].Polygons);
                             }
-                        });";
+                        }, polygonStyle);";
+                } else {
+                    for ($i = 0; $i < count($this->Markers); $i++) {
+                        $rendered .= "Microsoft.Maps.SpatialDataService.GeoDataAPIManager.getBoundary(
+                            ".$this->Markers[$i]->RenderLocation().",
+                            geoDataRequestOptions,
+                            {$mapVariable},
+                            function (data) {
+                                //Add the polygons to the map.
+                                if (data.results && data.results.length > 0) {
+                                    {$mapVariable}.entities.push(data.results[0].Polygons);
+                                }
+                            });";
+                    }
                 }
                 /*
                     
@@ -340,6 +408,7 @@ class Map extends ViewableData
         $rendered .= $this->RenderMapCenteringOnPins($mapVariable);
         $rendered .= $this->RenderClusterLayer($mapVariable);
         $rendered .= $this->RenderSpatialDataService($mapVariable);
+        $rendered .= $this->RenderPolygones($mapVariable);
 
         $rendered .= "}\n";
         $rendered .= $this->RenderInfoBoxCloser();
