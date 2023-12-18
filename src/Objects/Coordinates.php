@@ -30,6 +30,16 @@ class Coordinates
         $request = "http://dev.virtualearth.net/REST/v1/Locations?addressLine=$addressLine&key=$APIKey&output=xml";
         return self::getCoordsFromRequest($request);
     }
+    public static function GetCoordinatesFromQuery(string $query)
+    {
+        $APIKey = SiteConfig::current_site_config()->bingAPIKey;
+        if ($APIKey == "") {
+            throw new \Exception("No API Key Found");
+        }
+        $query = str_ireplace(" ", "%20", $Address);
+        $request = "http://dev.virtualearth.net/REST/v1/Locations?query=$query&key=$APIKey&output=xml";
+        return self::getCoordsFromRequest($request);
+    }
     private static function getCoordsFromRequest($requestURL)
     {
         $output = file_get_contents($requestURL);
