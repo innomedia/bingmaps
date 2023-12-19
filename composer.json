@@ -9,7 +9,6 @@
       }
     ],
     "require": {
-        "silverstripe/framework": "^4"
     },
     "autoload": {
       "psr-4": {
