@@ -45,7 +45,6 @@ class Map extends ViewableData
     public function __construct($ID = "1", $loadOnStartClass = "", $Debug = false)
     {
         $this->Debug = $Debug;
-        $this->Debug = true;
         $this->loadOnStartClass = $loadOnStartClass;
         $this->ID = $ID;
     }
