@@ -45,22 +45,22 @@ class Marker
     }
     public function GetMarkerVariable()
     {
-        return "pushpin$this->ID";
+        return "marker$this->ID";
     }
     
     private function RenderIcon()
     {
         if ($this->IconPath != null) {
-            return "{icon: '$this->IconPath'}";
+            return "{iconOptions: {image: '$this->IconPath'}}";
         }
         if ($this->Base64Icon != null) {
-            return "{icon: '$this->Base64Icon'}";
+            return "{iconOptions: {image: '$this->Base64Icon'}}";
         }
         if ($this->IconVariable != null) {
-            return "{icon: $this->IconVariable}";
+            return "{iconOptions: {image: $this->IconVariable}}";
         }
 
-        return "null";
+        return "{}";
     }
     public function RenderInfoBoxClosingFunction()
     {
@@ -76,13 +76,14 @@ class Marker
         }
         $rendered = "";
         $rendered .= $this->RenderLocationVariable($this->ID, self::$Suffix) . "\n";
-        $rendered .= "var pushpin$this->ID = new Microsoft.Maps.Pushpin({$this->GetLocationVariable($this->ID, self::$Suffix)},{$this->RenderIcon()});\n";
+        $rendered .= "var marker$this->ID = new atlas.HtmlMarker({$this->RenderIcon()});\n";
+        $rendered .= "marker$this->ID.setOptions({position: {$this->GetLocationVariable($this->ID, self::$Suffix)}});\n";
         if ($this->InfoBox != null) {
-            $rendered .= $this->InfoBox->Render($mapVariable, "pushpin$this->ID");
+            $rendered .= $this->InfoBox->Render($mapVariable, "marker$this->ID");
         }
         if(!$ClusterEnabled)
         {
-            $rendered .= "{$mapVariable}.entities.push(pushpin$this->ID);\n";
+            $rendered .= "{$mapVariable}.markers.add(marker$this->ID);\n";
         }
         
         return $rendered;
@@ -96,16 +97,17 @@ class Marker
         }
         $rendered = "";
         $rendered .= $this->RenderLocationVariable($this->ID, self::$Suffix) . "\n";
-        $rendered .= "var pushpin$this->ID = new Microsoft.Maps.Pushpin({$this->GetLocationVariable($this->ID, self::$Suffix)},{$this->RenderIcon()});\n";
+        $rendered .= "var marker$this->ID = new atlas.HtmlMarker({$this->RenderIcon()});\n";
+        $rendered .= "marker$this->ID.setOptions({position: {$this->GetLocationVariable($this->ID, self::$Suffix)}});\n";
         if ($this->InfoBox != null) {
-            $rendered .= $this->InfoBox->Render($mapVariable, "pushpin$this->ID");
+            $rendered .= $this->InfoBox->Render($mapVariable, "marker$this->ID");
         }
         if(!$ClusterEnabled)
         {
-            $rendered .= "{$mapVariable}.entities.push(pushpin$this->ID);\n";
+            $rendered .= "{$mapVariable}.markers.add(marker$this->ID);\n";
         }
         $data["rendered"] = $rendered;
-        $data["pushpinvariable"] = "pushpin$this->ID";
+        $data["pushpinvariable"] = "marker$this->ID";
 
         return $data;
     }

@@ -203,8 +203,8 @@ class Map extends ViewableData
     {
         $rendered = "";
         for ($i = 0; $i < count($this->Markers); $i++) {
-            $rendered .= "function closeInfoBox(i){
-                InfoBoxCollection[i].setOptions({visible:false});
+            $rendered .= "function closePopup(i){
+                InfoBoxCollection[i].close();
             }";
         }
         return $rendered;
@@ -212,8 +212,8 @@ class Map extends ViewableData
     private function RenderMapCenteringOnPins($mapVariable)
     {
         if ($this->CenterOnPins == true && count($this->Markers) > 0) {
-            return "{$mapVariable}.setView({\n
-                bounds: Microsoft.Maps.LocationRect.fromLocations(locs),\n
+            return "{$mapVariable}.setCamera({\n
+                bounds: atlas.data.BoundingBox.fromPositions(locs),\n
                 padding: $this->Padding\n
             });\n";
         }
@@ -231,10 +231,9 @@ class Map extends ViewableData
                 
             }
 
-            $rendered .= "Microsoft.Maps.loadModule('Microsoft.Maps.Clustering',function () {
-                clusterLayer = new Microsoft.Maps.ClusterLayer(locs);
-                {$mapVariable}.layers.insert(clusterLayer);
-            });\n";
+            // Azure Maps clustering would require a different approach
+            // For now, we'll just add markers normally
+            $rendered .= "// Clustering is not yet implemented for Azure Maps\n";
             return $rendered;
         }
         return "";
@@ -245,27 +244,31 @@ class Map extends ViewableData
             for ($i = 0; $i < count($this->PolygoneData); $i++){
                 if($this->PolygoneData[$i] !== ''){
                     $rendered .= "
-                    var center = {$mapVariable}.getCenter();
                     var exteriorRing = [
                     ";
                         for ($j = 0; $j < count($this->PolygoneData[$i]['Coords']); $j++){
                             if($this->PolygoneData[$i]['Coords'][$j] &&
                                 $this->PolygoneData[$i]['Coords'][$j] !== '' &&
                                 $this->PolygoneData[$i]['Coords'][$j]->IsValid()){
-                                $rendered .= "new Microsoft.Maps.Location({$this->PolygoneData[$i]['Coords'][$j]->GetLatitude()}, {$this->PolygoneData[$i]['Coords'][$j]->GetLongitude()}),
+                                $rendered .= "[{$this->PolygoneData[$i]['Coords'][$j]->GetLongitude()}, {$this->PolygoneData[$i]['Coords'][$j]->GetLatitude()}],
                             ";
                             }
                         }
                         $rendered .= "
                     ];
                     
-                    var polygon{$i} = new Microsoft.Maps.Polygon(exteriorRing, {
+                    var polygon{$i} = new atlas.data.Polygon([exteriorRing]);
+                    var polygonFeature{$i} = new atlas.data.Feature(polygon{$i}, {});
+                    
+                    var dataSource{$i} = new atlas.source.DataSource();
+                    {$mapVariable}.sources.add(dataSource{$i});
+                    dataSource{$i}.add(polygonFeature{$i});
+                    
+                    {$mapVariable}.layers.add(new atlas.layer.PolygonLayer(dataSource{$i}, null, {
                         fillColor: '{$this->PolygoneData[$i]['Colors']['Background']}',
                         strokeColor: '{$this->PolygoneData[$i]['Colors']['Stroke']}',
-                        strokeThinkness: 2
-                    });
-                    
-                    {$mapVariable}.entities.push(polygon{$i});
+                        strokeWidth: 2
+                    }));
                     ";
                 }
             }
@@ -276,54 +279,9 @@ class Map extends ViewableData
     private function RenderSpatialDataService($mapVariable)
     {
         if ($this->SpatialDataService == true) {
-
-            $rendered = "";
-
-            $rendered .= "var geoDataRequestOptions = {
-                entityType: '".$this->SpatialDataServiceType."',
-                getAllPolygons: true
-            };\n";
-
-            if($this->SpatialDataServicePostalCodes !== null) {
-                $rendered .= "var polygonStyle = {
-                    fillColor: 'rgba(13, 66, 104, 1)',
-                    strokeColor: '#fff',
-                    strokeThickness: 1
-                };\n";
-            }
-
-            $rendered .= "Microsoft.Maps.loadModule('Microsoft.Maps.SpatialDataService',function () {";
-                $rendered .= "var Locations = [];";
-                if($this->SpatialDataServicePostalCodes !== null){
-                    $rendered .= "Microsoft.Maps.SpatialDataService.GeoDataAPIManager.getBoundary(
-                        ".$this->SpatialDataServicePostalCodes.",
-                        geoDataRequestOptions,
-                        {$mapVariable},
-                        function (data) {
-                            //Add the polygons to the map.
-                            if (data.results && data.results.length > 0) {
-                                {$mapVariable}.entities.push(data.results[0].Polygons);
-                            }
-                        }, polygonStyle);";
-                } else {
-                    for ($i = 0; $i < count($this->Markers); $i++) {
-                        $rendered .= "Microsoft.Maps.SpatialDataService.GeoDataAPIManager.getBoundary(
-                            ".$this->Markers[$i]->RenderLocation().",
-                            geoDataRequestOptions,
-                            {$mapVariable},
-                            function (data) {
-                                //Add the polygons to the map.
-                                if (data.results && data.results.length > 0) {
-                                    {$mapVariable}.entities.push(data.results[0].Polygons);
-                                }
-                            });";
-                    }
-                }
-                /*
-                    
-                */
-            $rendered .="});\n";
-            return $rendered;
+            // Spatial Data Service for Azure Maps would require different implementation
+            // This feature is not yet implemented for Azure Maps
+            return "// Spatial Data Service is not yet implemented for Azure Maps\n";
         }
         return "";
     }

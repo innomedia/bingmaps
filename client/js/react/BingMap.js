@@ -1,14 +1,13 @@
 var map = {};
-var infoboxes = [];
+var popups = [];
 var locs = [];
-class BingMap extends React.Component{
+class AzureMap extends React.Component{
     constructor(props){
         super(props);
         this.mapRef = React.createRef();
-        this.GetBingJSSourceLink = this.GetBingJSSourceLink.bind(this);
         this.loadScript = this.loadScript.bind(this);
         this.MapCallBack = this.MapCallBack.bind(this);
-        this.closeInfoBox = this.closeInfoBox.bind(this);
+        this.closePopup = this.closePopup.bind(this);
         this.state = {
             map: null,
             locs: []
@@ -17,105 +16,105 @@ class BingMap extends React.Component{
     componentDidMount()
     {
         window.MapCallBack = this.MapCallBack;
-        window.closeInfoBox = this.closeInfoBox;
+        window.closePopup = this.closePopup;
         this.loadScript();
     }
-    closeInfoBox(e)
+    closePopup(e)
     {
         console.log(e);
     }
-    GetBingJSSourceLink()
-    {
-        return "https://www.bing.com/api/maps/mapcontrol?callback=MapCallBack&key="+this.props.APIKey;
-    }
     loadScript()
     {
-        const existingScript = document.getElementById('bingMap');
+        const existingScript = document.getElementById('azureMap');
         if (!existingScript) {
             const script = document.createElement('script');
-            script.src = this.GetBingJSSourceLink();
-            script.id = 'bingMap';
+            script.src = 'https://atlas.microsoft.com/sdk/javascript/mapcontrol/3/atlas.min.js';
+            script.id = 'azureMap';
+            script.onload = () => {
+                // Also load the CSS
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = 'https://atlas.microsoft.com/sdk/javascript/mapcontrol/3/atlas.min.css';
+                document.head.appendChild(link);
+                this.MapCallBack();
+            };
             document.body.appendChild(script);
+        } else {
+            this.MapCallBack();
         }
     }
     setMapCenter(position)
     {
-        map.setView({
-            center: new Microsoft.Maps.Location(position.latitude,position.longitude)
+        map.setCamera({
+            center: [position.longitude, position.latitude]
         });
     }
     setMarkers(Markers,map)
     {
         locs = [];
-        //clear pushpings before adding them again
+        //clear markers before adding them again
         if(map && Markers)
         {
-            for(var i = map.entities.getLength()-1;i >= 0;i--)
-            {
-                var pushpin = map.entities.get(i);
-                if(pushpin instanceof Microsoft.Maps.Pushpin)
-                {
-                    map.entities.removeAt(i);
-                }
-            }
+            map.markers.clear();
         }
-        //Add Pushpins
+        //Add Markers
         Markers.forEach((Marker,index) => {
-            let location = new Microsoft.Maps.Location(Marker.coordinates.latitude,Marker.coordinates.longitude);
-            locs.push(location);
-            let marker = new Microsoft.Maps.Pushpin(location,{icon: Marker.icon});
-            Microsoft.Maps.Events.addHandler(marker,"click",(e) => {
-                this.pushpinClicked(index);
+            let position = [Marker.coordinates.longitude, Marker.coordinates.latitude];
+            locs.push(position);
+            let marker = new atlas.HtmlMarker({
+                position: position,
+                htmlContent: Marker.icon ? `<img src="${Marker.icon}" style="width:32px;height:32px;"/>` : undefined
             });
-            map.entities.push(marker);
+            map.events.add('click', marker, (e) => {
+                this.markerClicked(index);
+            });
+            map.markers.add(marker);
         });
     }
     setInfoBoxes(Markers,map)
     {
         if(map && Markers)
         {
-            for(var i = map.entities.getLength()-1;i >= 0;i--)
-            {
-                var infobox = map.entities.get(i);
-                if(infobox instanceof Microsoft.Maps.Infobox)
-                {
-                    map.entities.removeAt(i);
-                }
-            }
+            map.popups.clear();
         }
         Markers.forEach((Marker,index) => {
             if("infobox" in Marker && Marker.infobox != undefined)
             {
-                let location = new Microsoft.Maps.Location(Marker.infobox.coordinates.latitude,Marker.infobox.coordinates.longitude);
-                var options = {}
-                options.title = Marker.infobox.title;
-                if(Marker.infobox.Description != null)
-                {
-                    options.description = Marker.infobox.Description;
+                let position = [Marker.infobox.coordinates.longitude, Marker.infobox.coordinates.latitude];
+                let content = '<div style="padding:10px">';
+                if(Marker.infobox.title) {
+                    content += `<h3>${Marker.infobox.title}</h3>`;
                 }
-                if(Marker.infobox.htmlContent != null)
-                {
-                    options.htmlContent = Marker.infobox.htmlContent;
+                if(Marker.infobox.Description) {
+                    content += `<p>${Marker.infobox.Description}</p>`;
                 }
-                options.visible = Marker.infobox.initialVisibility;
-                var infobox = new Microsoft.Maps.Infobox(location, options);
-                infobox.setMap(map);
-                infoboxes.push(infobox);
+                if(Marker.infobox.htmlContent) {
+                    content += Marker.infobox.htmlContent;
+                }
+                content += '</div>';
+                
+                var popup = new atlas.Popup({
+                    content: content,
+                    position: position,
+                    isVisible: Marker.infobox.initialVisibility
+                });
+                map.popups.add(popup);
+                popups.push(popup);
             }
         });
     }
     CenterOnPins()
     {
-        map.setView({
-            bounds: Microsoft.Maps.LocationRect.fromLocations(locs),
+        map.setCamera({
+            bounds: atlas.data.BoundingBox.fromPositions(locs),
             padding: this.props.Data.padding
         });
     }
-    pushpinClicked(index)
+    markerClicked(index)
     {
-        if(infoboxes[index] != undefined)
+        if(popups[index] != undefined)
         {
-            infoboxes[index].setOptions({visible:true});
+            popups[index].open(map);
         }
     }
     componentDidUpdate(prevProps,prevState,snapsho)
@@ -128,28 +127,38 @@ class BingMap extends React.Component{
     MapCallBack(e)
     {
         //TODO do away with complete initialization of map and do it step by step with functions etc that only trigger if they should be triggerd
-        //take https://github.com/iniamudhan/react-bingmaps/blob/dev/src/node_modules/components/ReactBingmaps/ReactBingmaps.js as an example
-        map = new Microsoft.Maps.Map(this.mapRef.current);
-        if(this.props.Position.latitude != 0 && this.props.Position.latitude != 0)
-        {
-            this.setMapCenter(this.props.Data.position);
-        }
-        if(this.props.Data.markers.length > 0)
-        {
-            this.setMarkers(this.props.Data.markers,map);
-            this.setInfoBoxes(this.props.Data.markers,map);
-        }
-        if(this.props.CenterOnPins)
-        {
-            this.CenterOnPins();
-        }        
+        map = new atlas.Map(this.mapRef.current, {
+            center: this.props.Data.position ? [this.props.Data.position.longitude, this.props.Data.position.latitude] : [0, 0],
+            zoom: this.props.Data.zoom || 10,
+            authOptions: {
+                authType: 'subscriptionKey',
+                subscriptionKey: this.props.APIKey
+            }
+        });
+        
+        // Wait for the map to be ready
+        map.events.add('ready', () => {
+            if(this.props.Position.latitude != 0 && this.props.Position.latitude != 0)
+            {
+                this.setMapCenter(this.props.Data.position);
+            }
+            if(this.props.Data.markers.length > 0)
+            {
+                this.setMarkers(this.props.Data.markers,map);
+                this.setInfoBoxes(this.props.Data.markers,map);
+            }
+            if(this.props.CenterOnPins)
+            {
+                this.CenterOnPins();
+            }
+        });        
     }
-    closeInfoBox(i)
+    closePopup(i)
     {
         var index = i - 1;
-        if(infoboxes[index] != undefined)
+        if(popups[index] != undefined)
         {
-            infoboxes[index].setOptions({visible:false});
+            popups[index].close();
         }
         
     }

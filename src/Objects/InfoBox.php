@@ -68,7 +68,7 @@ class InfoBox
     {
         if($this->Description != null)
         {
-            return "description: '{$this->Description}',";
+            return "content: '{$this->Description}',";
         }
         return "";
     }
@@ -77,7 +77,7 @@ class InfoBox
         if($this->HTMLContent != null)
         {
             $rendered = $this->getRenderedHTMLContent();
-            return "htmlContent: '{$rendered}',";
+            return "content: '{$rendered}',";
         }
         return "";
     }
@@ -100,8 +100,8 @@ class InfoBox
     {
         if($this->HTMLContent != null)
         {
-            return "function closeInfobox$this->ID(){
-                infobox$this->ID.setOptions({visible:false});
+            return "function closePopup$this->ID(){
+                popup$this->ID.close();
             }";
         }
         return "";
@@ -110,29 +110,29 @@ class InfoBox
     {
         if($this->InitialVisibility == true)
         {
-            return "visible: true";
+            return "isVisible: true";
         }
-        return "visible: false";
+        return "isVisible: false";
     }
-    public function Render($mapVariable, $pushpinVariable)
+    public function Render($mapVariable, $markerVariable)
     {
         if($this->IsValidCoordinate())
         {
             $rendered = "";
             $rendered .= $this->RenderLocationVariable($this->ID,self::$Suffix);
             $rendered .= "
-            var infobox$this->ID = new Microsoft.Maps.Infobox(\n
-                {$this->GetLocationVariable($this->ID,self::$Suffix)},{\n
-                    {$this->RenderTitle()}\n
-                    {$this->RenderDescription()}\n
-                    {$this->RenderHTMLContent()}\n
-                    {$this->RenderInitialVisibility()}\n
-                }\n
-            );\n
-            InfoBoxCollection.push(infobox$this->ID);
-            infobox{$this->ID}.setMap($mapVariable);\n
-            Microsoft.Maps.Events.addHandler($pushpinVariable,'click',() => {\n
-                infobox{$this->ID}.setOptions({visible:true});\n
+            var popup$this->ID = new atlas.Popup({\n
+                position: {$this->GetLocationVariable($this->ID,self::$Suffix)},\n
+                content: '<div style=\"padding:10px\">' +\n
+                    '<h3>{$this->Title}</h3>' +\n
+                    '<p>{$this->Description}</p>' +\n
+                    '</div>',\n
+                {$this->RenderInitialVisibility()}\n
+            });\n
+            InfoBoxCollection.push(popup$this->ID);
+            {$mapVariable}.popups.add(popup$this->ID);\n
+            {$mapVariable}.events.add('click', $markerVariable, () => {\n
+                popup{$this->ID}.open({$mapVariable});\n
             });\n
             ";
             
