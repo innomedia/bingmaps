@@ -1,6 +1,6 @@
-# SilverStripe Bing Map Abstraction
+# SilverStripe Azure Maps Abstraction
 
-This module provides bing map functionality
+This module provides Azure Maps functionality (migrated from Bing Maps)
 
 ## Installation
 
@@ -9,8 +9,10 @@ composer require innomedia/bingmaps
 ``` 
 ## Configuration
 
-Go to https://docs.microsoft.com/en-us/bingmaps/getting-started/bing-maps-dev-center-help/getting-a-bing-maps-key and follow instructions to get an API Key
-and enter it inside the SiteConfig of your page.
+Go to https://docs.microsoft.com/en-us/azure/azure-maps/how-to-manage-account-keys and follow instructions to get an Azure Maps Subscription Key
+and enter it inside the SiteConfig of your page under "Azure Maps" tab.
+
+**Note:** This module has been migrated from Bing Maps to Azure Maps while maintaining API compatibility. All method names remain the same for drop-in replacement.
 
 ## Usage
 
@@ -51,7 +53,7 @@ and enter it inside the SiteConfig of your page.
     ->SetPosition($Marker->GetPosition()) // Generally want to take the same as $Marker but can simply supply own Coordinates Object
     ;
     Coordinates::GetCoordinates($Latitude,$Longitude); // creates a Coordinates object with both values
-    Coordinates::GetCoordinatesFromAddress(/*string*/ $Address); // creates a Coordinates object after querying Bing for Lat/Lng from Address
+    Coordinates::GetCoordinatesFromAddress(/*string*/ $Address); // creates a Coordinates object after querying Azure Maps for Lat/Lng from Address
 *as of 0.2.2
     $map->DisableMouseWheelZoom(); will disable mouswheel zooming
 
@@ -59,5 +61,24 @@ and enter it inside the SiteConfig of your page.
 
     alternatively you can also use the React component and get the data it needs with $map->GetReactData();
     If you need the data as JSON you can use $map->GetJSONReactData; (simple json_encode version of GetReactData() result for convenience)
+
+## Migration from Bing Maps
+
+This module has been updated to use Azure Maps instead of the discontinued Bing Maps service. The migration maintains complete API compatibility:
+
+- All method names remain identical
+- All functionality is preserved  
+- Only the underlying map service has changed
+- Configuration now uses Azure Maps Subscription Key instead of Bing API Key
+- React component has been updated to use Azure Maps Web SDK
+
+### Breaking Changes
+- **None** - This is designed as a drop-in replacement
+- Simply update your Azure Maps subscription key in SiteConfig
+
+### New Features in Azure Maps
+- More reliable geocoding service
+- Better performance and modern API
+- Active development and support from Microsoft
 ```
 
