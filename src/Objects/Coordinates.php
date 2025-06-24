@@ -1,7 +1,6 @@
 <?php
 namespace bingMap;
 
-use SimpleXMLElement;
 use bingMap\Coordinates;
 use SilverStripe\Dev\Debug;
 use SilverStripe\SiteConfig\SiteConfig;
@@ -26,8 +25,8 @@ class Coordinates
         if ($APIKey == "") {
             throw new \Exception("No API Key Found");
         }
-        $addressLine = str_ireplace(" ", "%20", $Address);
-        $request = "http://dev.virtualearth.net/REST/v1/Locations?addressLine=$addressLine&key=$APIKey&output=xml";
+        $addressLine = urlencode($Address);
+        $request = "https://atlas.microsoft.com/search/address/json?subscription-key=$APIKey&api-version=1.0&query=$addressLine";
         return self::getCoordsFromRequest($request);
     }
     public static function GetCoordinatesFromQuery(string $query)
@@ -36,18 +35,23 @@ class Coordinates
         if ($APIKey == "") {
             throw new \Exception("No API Key Found");
         }
-        $query = str_ireplace(" ", "%20", $Address);
-        $request = "http://dev.virtualearth.net/REST/v1/Locations?query=$query&key=$APIKey&output=xml";
+        $query = urlencode($query);
+        $request = "https://atlas.microsoft.com/search/fuzzy/json?subscription-key=$APIKey&api-version=1.0&query=$query";
         return self::getCoordsFromRequest($request);
     }
     private static function getCoordsFromRequest($requestURL)
     {
         $output = file_get_contents($requestURL);
-        $response = new SimpleXMLElement($output);
+        $response = json_decode($output, true);
 
-// Extract data (e.g. latitude and longitude) from the results
-        $latitude = (string) $response->ResourceSets->ResourceSet->Resources->Location->Point->Latitude;
-        $longitude = (string) $response->ResourceSets->ResourceSet->Resources->Location->Point->Longitude;
+        // Extract data (e.g. latitude and longitude) from the results
+        if (isset($response['results']) && count($response['results']) > 0) {
+            $latitude = $response['results'][0]['position']['lat'];
+            $longitude = $response['results'][0]['position']['lon'];
+        } else {
+            throw new \Exception("No coordinates found for the given address");
+        }
+        
         return new Coordinates($latitude, $longitude);
     }
     public function GetLatitude()

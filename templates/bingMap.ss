@@ -1,4 +1,5 @@
-<script <% if $HasLoadOnStartClass %>class='{$GetLoadOnStartClass}' type='text/plain'<% else %>type='text/javascript'<% end_if %> src='https://www.bing.com/api/maps/mapcontrol?callback=GetMap{$ID}&key=$SiteConfig.bingAPIKey' async defer></script>
+<link rel="stylesheet" href="https://atlas.microsoft.com/sdk/javascript/mapcontrol/3/atlas.min.css" type="text/css" />
+<script src="https://atlas.microsoft.com/sdk/javascript/mapcontrol/3/atlas.min.js"></script>
 <div id="MapContainer{$ID}" style='$Styles'></div>
 $Script.RAW
  

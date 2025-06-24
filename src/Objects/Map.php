@@ -4,6 +4,7 @@ namespace bingMap;
 use bingMap\MapPosition;
 use SilverStripe\Dev\Debug;
 use SilverStripe\View\ViewableData;
+use SilverStripe\SiteConfig\SiteConfig;
 
 class Map extends ViewableData
 {
@@ -139,16 +140,16 @@ class Map extends ViewableData
     }
     public function SetDarkMapType()
     {
-        return $this->SetMapType("Microsoft.Maps.MapTypeId.canvasDark");
+        return $this->SetMapType("'dark'");
     }
     //Default when nothing is set
     public function SetLightMapType()
     {
-        return $this->SetMapType("Microsoft.Maps.MapTypeId.canvasLight");
+        return $this->SetMapType("'road'");
     }
     public function SetGrayscaleMapType()
     {
-        return $this->SetMapType("Microsoft.Maps.MapTypeId.grayscale");
+        return $this->SetMapType("'grayscale_light'");
     }
     public function HasLoadOnStartClass()
     {
@@ -342,7 +343,7 @@ class Map extends ViewableData
     public function RenderZoom()
     {
         if ($this->Zoom != null) {
-            return ",zoom: " . $this->Zoom;
+            return ",\n                zoom: " . $this->Zoom;
         }
         return "";
     }
@@ -350,7 +351,7 @@ class Map extends ViewableData
     {
         if($this->MapType != null && $this->MapType != "")
         {
-            return ",mapTypeId: ".$this->MapType;
+            return ",\n                style: ".$this->MapType;
         }
         return "";
         
@@ -398,7 +399,13 @@ class Map extends ViewableData
         $mapVariable = "map" . $this->ID;
 
         $rendered .= "
-            var $mapVariable = new Microsoft.Maps.Map('#MapContainer{$this->ID}',{center:{$this->RenderLocation()} {$this->RenderZoom()} {$this->RenderMapTypeID()}});\n
+            var $mapVariable = new atlas.Map('MapContainer{$this->ID}',{
+                center:{$this->RenderLocation()}{$this->RenderZoom()}{$this->RenderMapTypeID()},
+                authOptions: {
+                    authType: 'subscriptionKey',
+                    subscriptionKey: '" . SiteConfig::current_site_config()->bingAPIKey . "'
+                }
+            });\n
         ";
         $rendered .= $this->RenderOptions($mapVariable);
         $rendered .= $this->RenderIcon();
