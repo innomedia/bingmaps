@@ -36,6 +36,11 @@ class InfoBox
         $this->Title = $Title;
         return $this;
     }
+    public function SetContent($Content)
+    {
+        $this->Description = $Content;
+        return $this;
+    }
     public function SetDescription($Description)
     {
         $this->Description = $Description;
@@ -68,7 +73,7 @@ class InfoBox
     {
         if($this->Description != null)
         {
-            return "description: '{$this->Description}',";
+            return "content: '{$this->Description}',";
         }
         return "";
     }
@@ -77,7 +82,7 @@ class InfoBox
         if($this->HTMLContent != null)
         {
             $rendered = $this->getRenderedHTMLContent();
-            return "htmlContent: '{$rendered}',";
+            return "content: '{$rendered}',";
         }
         return "";
     }
@@ -100,8 +105,8 @@ class InfoBox
     {
         if($this->HTMLContent != null)
         {
-            return "function closeInfobox$this->ID(){
-                infobox$this->ID.setOptions({visible:false});
+            return "function closePopup$this->ID(){
+                popup$this->ID.close();
             }";
         }
         return "";
@@ -110,36 +115,63 @@ class InfoBox
     {
         if($this->InitialVisibility == true)
         {
-            return "visible: true";
+            return "isVisible: true";
         }
-        return "visible: false";
+        return "isVisible: false";
     }
-    public function Render($mapVariable, $pushpinVariable)
+    public function Render($mapVariable, $markerVariable)
     {
         if($this->IsValidCoordinate())
         {
             $rendered = "";
             $rendered .= $this->RenderLocationVariable($this->ID,self::$Suffix);
-            $rendered .= "
-            var infobox$this->ID = new Microsoft.Maps.Infobox(\n
-                {$this->GetLocationVariable($this->ID,self::$Suffix)},{\n
-                    {$this->RenderTitle()}\n
-                    {$this->RenderDescription()}\n
-                    {$this->RenderHTMLContent()}\n
-                    {$this->RenderInitialVisibility()}\n
-                }\n
-            );\n
-            InfoBoxCollection.push(infobox$this->ID);
-            infobox{$this->ID}.setMap($mapVariable);\n
-            Microsoft.Maps.Events.addHandler($pushpinVariable,'click',() => {\n
-                infobox{$this->ID}.setOptions({visible:true});\n
-            });\n
+            
+            // Build content - use double quotes to avoid conflicts with single quotes in HTML
+            $content = '<div style="padding:10px">';
+            if ($this->Title) {
+                $content .= '<h3>' . htmlspecialchars($this->Title, ENT_QUOTES) . '</h3>';
+            }
+            if ($this->Description) {
+                $content .= '<p>' . htmlspecialchars($this->Description, ENT_QUOTES) . '</p>';
+            }
+            if ($this->HTMLContent) {
+                $content .= htmlspecialchars($this->getRenderedHTMLContent(), ENT_QUOTES);
+            }
+            $content .= '</div>';
+            
+            // Use json_encode to properly escape the content for JavaScript
+            $contentJson = json_encode($content);
+            
+            $rendered .= "var popup$this->ID = new atlas.Popup({
+                position: {$this->GetLocationVariable($this->ID,self::$Suffix)},
+                content: $contentJson
+            });
+            InfoBoxCollection.push(popup$this->ID);
+            {$mapVariable}.popups.add(popup$this->ID);
+            {$mapVariable}.events.add('click', $markerVariable, function() {
+                popup{$this->ID}.open({$mapVariable});
+            });
             ";
             
             return $rendered;
         }
-        return "console.log('Skipping Invalid Coordinates');\n";
+        return "console.log('Skipping Invalid Coordinates');";
         
+    }
+    public function GetContent()
+    {
+        $content = "<div style='padding:10px'>";
+        if ($this->Title) {
+            $content .= "<h3>" . htmlspecialchars($this->Title) . "</h3>";
+        }
+        if ($this->Description) {
+            $content .= "<p>" . htmlspecialchars($this->Description) . "</p>";
+        }
+        if ($this->HTMLContent) {
+            $content .= $this->getRenderedHTMLContent();
+        }
+        $content .= "</div>";
+        return $content;
     }
     public function GetReactData()
     {

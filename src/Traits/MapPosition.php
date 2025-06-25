@@ -40,13 +40,13 @@ trait MapPosition
     }
     public function RenderLocationVariable($ID,$Suffix)
     {
-        return "var Location_{$Suffix}_{$ID} = new Microsoft.Maps.Location({$this->GetLatitude()},{$this->GetLongitude()}); ";
+        return "var Location_{$Suffix}_{$ID} = [{$this->GetLongitude()}, {$this->GetLatitude()}]; ";
     }
     public function RenderLocation()
     {
         if($this->HasPosition())
         {
-            return "new Microsoft.Maps.Location({$this->GetLatitude()},{$this->GetLongitude()})";
+            return "[{$this->GetLongitude()}, {$this->GetLatitude()}]";
         }
         return "";
     } 

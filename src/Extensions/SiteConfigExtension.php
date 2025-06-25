@@ -14,6 +14,6 @@ class SiteConfigExtension extends DataExtension
 
     public function updateCMSFields(FieldList $fields)
     {
-        $fields->addFieldToTab('Root.Bing',TextField::create('bingAPIKey','Bing API Schlüssel'));
+        $fields->addFieldToTab('Root.Azure Maps',TextField::create('bingAPIKey','Azure Maps Subscription Key'));
     }
 }
