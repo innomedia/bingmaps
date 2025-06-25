@@ -101,7 +101,15 @@ class Marker
             } elseif ($this->IconVariable != null) {
                 $rendered .= "' + $this->IconVariable + '";
             }
-            $rendered .= "); width: 32px; height: 32px; background-size: contain; background-repeat: no-repeat;\"></div>'";
+            $rendered .= ")\"><img src=\"";
+            if ($this->IconPath != null) {
+                $rendered .= "$this->IconPath";
+            } elseif ($this->Base64Icon != null) {
+                $rendered .= "$this->Base64Icon";
+            } elseif ($this->IconVariable != null) {
+                $rendered .= "' + $this->IconVariable + '";
+            }
+            $rendered .= "\" style=\"display: block;\"></div>'";
         }
         
         $rendered .= "\n});\n";
@@ -130,7 +138,8 @@ class Marker
         $rendered .= "var point$this->ID = new atlas.data.Feature(new atlas.data.Point({$this->GetLocationVariable($this->ID, self::$Suffix)}), {\n";
         $rendered .= "    markerId: '$this->ID'";
         if ($this->InfoBox != null) {
-            $rendered .= ",\n    popupContent: '" . addslashes($this->InfoBox->GetContent()) . "'";
+            $content = $this->InfoBox->GetContent();
+            $rendered .= ",\n    popupContent: " . json_encode($content);
         }
         $rendered .= "\n});\n";
         

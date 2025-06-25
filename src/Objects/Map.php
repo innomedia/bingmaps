@@ -188,17 +188,19 @@ class Map extends ViewableData
         if ($this->CenterOnPins == true || $this->ClusterLayer == true) {
             $rendered .= "var locs = [];\n";
         }
+        
         for ($i = 0; $i < count($this->Markers); $i++) {
             if($this->ClusterLayer == false)
             {
                 $rendered .= "console.log('Adding marker " . ($i + 1) . "...');\n";
                 $rendered .= $this->Markers[$i]->Render($mapVariable,$this->ClusterLayer);
-                if ($this->CenterOnPins == true) {
-                    $loc = $this->Markers[$i]->RenderLocation();
-                    $rendered .= "locs.push($loc);\n";
-                }
             }
             
+            // Always add locations for centering, regardless of cluster mode
+            if ($this->CenterOnPins == true) {
+                $loc = $this->Markers[$i]->RenderLocation();
+                $rendered .= "locs.push($loc);\n";
+            }
         }
         $rendered .= "console.log('Markers rendering complete.');\n";
         return $rendered;
@@ -231,8 +233,11 @@ class Map extends ViewableData
             // Create data source for clustering
             $rendered .= "var clusterDataSource = new atlas.source.DataSource(null, {
                 cluster: true,
-                clusterRadius: 45,
-                clusterMaxZoom: 15
+                clusterRadius: 80,
+                clusterMaxZoom: 15,
+                clusterProperties: {
+                    'popupContent': [['get', 'popupContent'], ['literal', '']]
+                }
             });\n";
             $rendered .= "{$mapVariable}.sources.add(clusterDataSource);\n";
             
@@ -246,15 +251,31 @@ class Map extends ViewableData
             }
             
             $rendered .= "clusterDataSource.add(clusterPoints);\n";
+            $rendered .= "console.log('Added ' + clusterPoints.length + ' points to cluster data source');\n";
             
-            // Create bubble layer for clusters
+            // Create bubble layer for clusters with dynamic sizing
             $rendered .= "{$mapVariable}.layers.add(new atlas.layer.BubbleLayer(clusterDataSource, null, {
-                radius: 20,
-                color: '#007faa',
+                radius: [
+                    'step',
+                    ['get', 'point_count'],
+                    15,        // Default radius for small clusters
+                    10, 20,    // If point_count >= 10, radius = 20
+                    50, 30,    // If point_count >= 50, radius = 30
+                    100, 40    // If point_count >= 100, radius = 40
+                ],
+                color: [
+                    'step',
+                    ['get', 'point_count'],
+                    '#51bbd6',   // Default color for small clusters
+                    10, '#f1f075',  // Yellow for medium clusters
+                    50, '#f28cb1',  // Pink for large clusters
+                    100, '#e55e5e'  // Red for very large clusters
+                ],
                 strokeColor: 'white',
                 strokeWidth: 2,
                 filter: ['has', 'point_count']
             }));\n";
+            $rendered .= "console.log('Bubble layer added for clusters');\n";
             
             // Create symbol layer for cluster count labels
             $rendered .= "{$mapVariable}.layers.add(new atlas.layer.SymbolLayer(clusterDataSource, null, {
@@ -264,18 +285,59 @@ class Map extends ViewableData
                 textOptions: {
                     textField: ['get', 'point_count_abbreviated'],
                     offset: [0, 0.4],
-                    color: 'white'
+                    color: 'white',
+                    font: ['StandardFont-Bold'],
+                    size: 12
                 },
                 filter: ['has', 'point_count']
             }));\n";
+            $rendered .= "console.log('Symbol layer added for cluster counts');\n";
             
             // Create symbol layer for individual points (unclustered)
-            $rendered .= "{$mapVariable}.layers.add(new atlas.layer.SymbolLayer(clusterDataSource, null, {
-                filter: ['!', ['has', 'point_count']],
-                iconOptions: {
-                    image: 'marker-red'
-                }
-            }));\n";
+            $iconImage = 'pin-round-blue'; // Default icon
+            if ($this->IconPath != null) {
+                // If custom icon is set, we need to load it as an image template
+                $rendered .= "
+                // Load custom icon image and create symbol layer when ready
+                {$mapVariable}.imageSprite.add('custom-marker', '{$this->IconPath}').then(function() {
+                    console.log('Custom icon loaded successfully');
+                    // Create symbol layer for individual points after icon is loaded
+                    var unclusteredLayer = new atlas.layer.SymbolLayer(clusterDataSource, null, {
+                        filter: ['!', ['has', 'point_count']],
+                        iconOptions: {
+                            image: 'custom-marker',
+                            size: 1.0,
+                            anchor: 'center'
+                        }
+                    });
+                    {$mapVariable}.layers.add(unclusteredLayer);
+                    console.log('Symbol layer added for individual points with custom icon');
+                }, function(error) {
+                    console.error('Failed to load custom icon:', error);
+                    // Fallback to default icon if custom icon fails to load
+                    var unclusteredLayer = new atlas.layer.SymbolLayer(clusterDataSource, null, {
+                        filter: ['!', ['has', 'point_count']],
+                        iconOptions: {
+                            image: 'pin-round-blue',
+                            size: 1.0,
+                            anchor: 'center'
+                        }
+                    });
+                    {$mapVariable}.layers.add(unclusteredLayer);
+                    console.log('Symbol layer added for individual points with fallback icon');
+                });
+                ";
+            } else {
+                $rendered .= "{$mapVariable}.layers.add(new atlas.layer.SymbolLayer(clusterDataSource, null, {
+                    filter: ['!', ['has', 'point_count']],
+                    iconOptions: {
+                        image: 'pin-round-blue',
+                        size: 1.0,
+                        anchor: 'center'
+                    }
+                }));\n";
+                $rendered .= "console.log('Symbol layer added for individual points with default icon');\n";
+            }
             
             // Add click event for clusters to zoom in
             $rendered .= "{$mapVariable}.events.add('click', clusterDataSource, function(e) {
@@ -297,6 +359,18 @@ class Map extends ViewableData
                     }
                 }
             });\n";
+            
+            // Add mouse enter event to change cursor
+            $rendered .= "{$mapVariable}.events.add('mouseenter', clusterDataSource, function() {
+                {$mapVariable}.getCanvasContainer().style.cursor = 'pointer';
+            });\n";
+            
+            // Add mouse leave event to reset cursor
+            $rendered .= "{$mapVariable}.events.add('mouseleave', clusterDataSource, function() {
+                {$mapVariable}.getCanvasContainer().style.cursor = 'grab';
+            });\n";
+            
+            $rendered .= "console.log('Azure Maps clustering setup complete - all layers and events configured');\n";
             
             return $rendered;
         }
@@ -495,7 +569,7 @@ class Map extends ViewableData
         }
         
         $rendered .= "var InfoBoxCollection = [];\n";
-        $rendered .= "console.log('Starting map initialization for map ID: {$this->ID}');\n";
+        $rendered .= "console.log('Starting Azure Maps initialization for map ID: {$this->ID}');\n";
         
         // WebGL detection function
         $rendered .= "function checkWebGLSupport() {\n";
@@ -504,25 +578,34 @@ class Map extends ViewableData
         $rendered .= "        var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');\n";
         $rendered .= "        return !!gl;\n";
         $rendered .= "    } catch (e) {\n";
+        $rendered .= "        console.error('WebGL check failed:', e);\n";
         $rendered .= "        return false;\n";
+        $rendered .= "    }\n";
+        $rendered .= "}\n";
+        
+        // Function to show error message
+        $rendered .= "function showMapError(message) {\n";
+        $rendered .= "    console.error('Map Error: ' + message);\n";
+        $rendered .= "    var container = document.getElementById('MapContainer{$this->ID}');\n";
+        $rendered .= "    if (container) {\n";
+        $rendered .= "        container.innerHTML = '<div style=\"padding: 20px; text-align: center; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; color: #6c757d;\">' +\n";
+        $rendered .= "                              '<strong>Map Error:</strong><br>' + message + '</div>';\n";
         $rendered .= "    }\n";
         $rendered .= "}\n";
         
         // Check if API key is available
         $apiKey = SiteConfig::current_site_config()->bingAPIKey ?? '';
         if (empty($apiKey)) {
-            $rendered .= "console.error('No API key found! Using OpenLayers fallback.');\n";
-            $rendered .= $this->RenderOpenLayersMap();
+            $rendered .= "showMapError('Azure Maps API key is not configured. Please contact the administrator.');\n";
         } else {
             $rendered .= "console.log('API key found, length: " . strlen($apiKey) . "');\n";
             
-            // Try Azure Maps first, fallback to OpenLayers if WebGL not supported
+            // Check WebGL support before initializing Azure Maps
             $rendered .= "if (checkWebGLSupport()) {\n";
-            $rendered .= "    console.log('WebGL supported, using Azure Maps');\n";
+            $rendered .= "    console.log('WebGL supported, initializing Azure Maps');\n";
             $rendered .= $this->RenderAzureMap();
             $rendered .= "} else {\n";
-            $rendered .= "    console.log('WebGL not supported, using OpenLayers fallback');\n";
-            $rendered .= $this->RenderOpenLayersMap();
+            $rendered .= "    showMapError('WebGL is not supported in your browser. Azure Maps requires WebGL to function properly.');\n";
             $rendered .= "}\n";
         }
         
@@ -544,18 +627,29 @@ class Map extends ViewableData
 
         $rendered .= "
             console.log('Creating Azure Map...');
-            var $mapVariable = new atlas.Map('MapContainer{$this->ID}',{
-                center:{$this->RenderLocation()}{$this->RenderZoom()}{$this->RenderMapTypeID()},
-                authOptions: {
-                    authType: 'subscriptionKey',
-                    subscriptionKey: '" . SiteConfig::current_site_config()->bingAPIKey . "'
-                }
-            });\n
-            console.log('Map created, waiting for ready event...');
+            try {
+                var $mapVariable = new atlas.Map('MapContainer{$this->ID}',{
+                    center:{$this->RenderLocation()}{$this->RenderZoom()}{$this->RenderMapTypeID()},
+                    authOptions: {
+                        authType: 'subscriptionKey',
+                        subscriptionKey: '" . SiteConfig::current_site_config()->bingAPIKey . "'
+                    }
+                });
+                console.log('Map created, waiting for ready event...');
+            } catch (error) {
+                console.error('Failed to create Azure Map:', error);
+                showMapError('Failed to initialize Azure Maps. Please check your internet connection and try again.');
+                return;
+            }
         ";
         
         // Wait for map to be ready before adding content
+        $rendered .= "var mapReadyTimeout = setTimeout(function() {\n";
+        $rendered .= "    showMapError('Map is taking too long to load. Please check your internet connection and try again.');\n";
+        $rendered .= "}, 10000);\n"; // 10 second timeout
+        
         $rendered .= "{$mapVariable}.events.add('ready', function() {\n";
+        $rendered .= "clearTimeout(mapReadyTimeout);\n";
         $rendered .= "console.log('Map is ready! Adding content...');\n";
         
         $rendered .= $this->RenderOptions($mapVariable);
@@ -568,13 +662,6 @@ class Map extends ViewableData
         
         $rendered .= "});\n"; // Close the ready event
         
-        // Add error handling with fallback
-        $rendered .= "{$mapVariable}.events.add('error', function(error) {\n";
-        $rendered .= "console.error('Azure Maps error, falling back to OpenLayers:', error);\n";
-        $rendered .= "document.getElementById('MapContainer{$this->ID}').innerHTML = '';\n";
-        $rendered .= $this->RenderOpenLayersMapDirect();
-        $rendered .= "});\n";
-        
         $rendered .= "console.log('Azure Maps setup complete.');\n";
         $rendered .= "}\n";
         $rendered .= $this->RenderInfoBoxCloser();
@@ -583,172 +670,6 @@ class Map extends ViewableData
         return $rendered;
     }
     
-    private function RenderOpenLayersMap()
-    {
-        $rendered = "";
-        $rendered .= "function GetMap{$this->ID}(){\n";
-        $rendered .= $this->RenderOpenLayersMapDirect();
-        $rendered .= "}\n";
-        $rendered .= "GetMap{$this->ID}();\n";
-        
-        return $rendered;
-    }
-    
-    private function RenderOpenLayersMapDirect()
-    {
-        $rendered = "";
-        $mapVariable = "map" . $this->ID;
-        
-        $rendered .= "
-            console.log('Creating OpenLayers Map...');
-            
-            var centerCoords = ol.proj.fromLonLat({$this->RenderLocation()});
-            
-            var {$mapVariable} = new ol.Map({
-                target: 'MapContainer{$this->ID}',
-                layers: [
-                    new ol.layer.Tile({
-                        source: {$this->GetOpenLayersSource()}
-                    })
-                ],
-                view: new ol.View({
-                    center: centerCoords,
-                    zoom: {$this->RenderZoomValue()}
-                })
-            });
-            console.log('OpenLayers map created successfully!');
-        ";
-        
-        if ($this->MouseWheelZoom) {
-            $rendered .= "
-            {$mapVariable}.getInteractions().forEach(function(interaction) {
-                if (interaction instanceof ol.interaction.MouseWheelZoom) {
-                    {$mapVariable}.removeInteraction(interaction);
-                }
-            });
-            ";
-        }
-        
-        $rendered .= $this->RenderOpenLayersMarkers($mapVariable);
-        $rendered .= "console.log('OpenLayers map setup complete.');\n";
-        
-        return $rendered;
-    }
-    
-    private function GetOpenLayersSource()
-    {
-        switch ($this->MapType) {
-            case "'dark'":
-                return "new ol.source.XYZ({
-                    url: 'https://cartodb-basemaps-{a-c}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png'
-                })";
-            case "'grayscale_light'":
-                return "new ol.source.XYZ({
-                    url: 'https://cartodb-basemaps-{a-c}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png'
-                })";
-            default:
-                return "new ol.source.OSM()";
-        }
-    }
-    
-    private function RenderOpenLayersMarkers($mapVariable)
-    {
-        if (count($this->Markers) == 0) {
-            return "";
-        }
-        
-        $rendered = "";
-        $rendered .= "console.log('Rendering " . count($this->Markers) . " markers with OpenLayers...');\n";
-        $rendered .= "var markerFeatures = [];\n";
-        
-        for ($i = 0; $i < count($this->Markers); $i++) {
-            $marker = $this->Markers[$i];
-            if ($marker->IsValidCoordinate()) {
-                $coords = "[{$marker->GetLongitude()}, {$marker->GetLatitude()}]";
-                $rendered .= "
-                var marker{$i}Coords = ol.proj.fromLonLat($coords);
-                var marker{$i}Feature = new ol.Feature({
-                    geometry: new ol.geom.Point(marker{$i}Coords),
-                    markerId: 'marker{$i}'";
-                
-                // Add popup content if InfoBox exists
-                if ($marker->HasInfoBox()) {
-                    $infoBox = $marker->GetInfoBox();
-                    $content = addslashes($infoBox->GetContent());
-                    $rendered .= ",\n                    popupContent: '$content'";
-                }
-                
-                $rendered .= "
-                });
-                markerFeatures.push(marker{$i}Feature);
-                ";
-            }
-        }
-        
-        $rendered .= "
-        // Create vector layer for markers
-        var vectorSource = new ol.source.Vector({
-            features: markerFeatures
-        });
-        
-        var markerLayer = new ol.layer.Vector({
-            source: vectorSource,
-            style: new ol.style.Style({
-                image: new ol.style.Circle({
-                    radius: 8,
-                    fill: new ol.style.Fill({color: 'red'}),
-                    stroke: new ol.style.Stroke({color: 'white', width: 2})
-                })
-            })
-        });
-        
-        {$mapVariable}.addLayer(markerLayer);
-        ";
-        
-        // Center on pins if enabled
-        if ($this->CenterOnPins && count($this->Markers) > 0) {
-            $rendered .= "
-            if (markerFeatures.length > 0) {
-                var extent = vectorSource.getExtent();
-                {$mapVariable}.getView().fit(extent, {
-                    padding: [{$this->Padding}, {$this->Padding}, {$this->Padding}, {$this->Padding}],
-                    maxZoom: 16
-                });
-            }
-            ";
-        }
-        
-        // Add popup functionality
-        $rendered .= "
-        // Add popup overlay
-        var popup = new ol.Overlay({
-            element: document.createElement('div'),
-            positioning: 'bottom-center',
-            stopEvent: false,
-            offset: [0, -20]
-        });
-        
-        popup.getElement().style.cssText = 'background: white; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); max-width: 200px;';
-        {$mapVariable}.addOverlay(popup);
-        
-        {$mapVariable}.on('click', function(evt) {
-            var feature = {$mapVariable}.forEachFeatureAtPixel(evt.pixel, function(feature) {
-                return feature;
-            });
-            
-            if (feature && feature.get('popupContent')) {
-                popup.getElement().innerHTML = feature.get('popupContent');
-                popup.setPosition(evt.coordinate);
-            } else {
-                popup.setPosition(undefined);
-            }
-        });
-        ";
-        
-        $rendered .= "console.log('OpenLayers markers rendering complete.');\n";
-        return $rendered;
-    }
-
     private function GetMarkersData()
     {
         $MarkersData = [];
@@ -776,4 +697,24 @@ class Map extends ViewableData
         return json_encode($this->GetReactData());
     }
 
+    // Getter methods for debugging
+    public function getID()
+    {
+        return $this->ID;
+    }
+    
+    public function getClusterLayer()
+    {
+        return $this->ClusterLayer;
+    }
+    
+    public function getMarkers()
+    {
+        return $this->Markers;
+    }
+    
+    public function getIconPath()
+    {
+        return $this->IconPath;
+    }
 }
