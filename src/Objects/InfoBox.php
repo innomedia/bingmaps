@@ -36,6 +36,11 @@ class InfoBox
         $this->Title = $Title;
         return $this;
     }
+    public function SetContent($Content)
+    {
+        $this->Description = $Content;
+        return $this;
+    }
     public function SetDescription($Description)
     {
         $this->Description = $Description;
@@ -120,26 +125,53 @@ class InfoBox
         {
             $rendered = "";
             $rendered .= $this->RenderLocationVariable($this->ID,self::$Suffix);
-            $rendered .= "
-            var popup$this->ID = new atlas.Popup({\n
-                position: {$this->GetLocationVariable($this->ID,self::$Suffix)},\n
-                content: '<div style=\"padding:10px\">' +\n
-                    '<h3>{$this->Title}</h3>' +\n
-                    '<p>{$this->Description}</p>' +\n
-                    '</div>',\n
-                {$this->RenderInitialVisibility()}\n
-            });\n
+            
+            // Build content - use double quotes to avoid conflicts with single quotes in HTML
+            $content = '<div style="padding:10px">';
+            if ($this->Title) {
+                $content .= '<h3>' . htmlspecialchars($this->Title, ENT_QUOTES) . '</h3>';
+            }
+            if ($this->Description) {
+                $content .= '<p>' . htmlspecialchars($this->Description, ENT_QUOTES) . '</p>';
+            }
+            if ($this->HTMLContent) {
+                $content .= htmlspecialchars($this->getRenderedHTMLContent(), ENT_QUOTES);
+            }
+            $content .= '</div>';
+            
+            // Use json_encode to properly escape the content for JavaScript
+            $contentJson = json_encode($content);
+            
+            $rendered .= "var popup$this->ID = new atlas.Popup({
+                position: {$this->GetLocationVariable($this->ID,self::$Suffix)},
+                content: $contentJson
+            });
             InfoBoxCollection.push(popup$this->ID);
-            {$mapVariable}.popups.add(popup$this->ID);\n
-            {$mapVariable}.events.add('click', $markerVariable, () => {\n
-                popup{$this->ID}.open({$mapVariable});\n
-            });\n
+            {$mapVariable}.popups.add(popup$this->ID);
+            {$mapVariable}.events.add('click', $markerVariable, function() {
+                popup{$this->ID}.open({$mapVariable});
+            });
             ";
             
             return $rendered;
         }
-        return "console.log('Skipping Invalid Coordinates');\n";
+        return "console.log('Skipping Invalid Coordinates');";
         
+    }
+    public function GetContent()
+    {
+        $content = "<div style='padding:10px'>";
+        if ($this->Title) {
+            $content .= "<h3>" . htmlspecialchars($this->Title) . "</h3>";
+        }
+        if ($this->Description) {
+            $content .= "<p>" . htmlspecialchars($this->Description) . "</p>";
+        }
+        if ($this->HTMLContent) {
+            $content .= $this->getRenderedHTMLContent();
+        }
+        $content .= "</div>";
+        return $content;
     }
     public function GetReactData()
     {

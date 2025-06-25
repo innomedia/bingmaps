@@ -10,7 +10,7 @@ class Map extends ViewableData
 {
     use MapPosition;
 
-    private $Debug;
+    private $Debug = true;
     private $ID;
     private $Style;
     private $Height = 500;
@@ -183,12 +183,15 @@ class Map extends ViewableData
     private function RenderMarkers($mapVariable)
     {
         $rendered = "";
+        $rendered .= "console.log('Rendering " . count($this->Markers) . " markers...');\n";
+        
         if ($this->CenterOnPins == true || $this->ClusterLayer == true) {
             $rendered .= "var locs = [];\n";
         }
         for ($i = 0; $i < count($this->Markers); $i++) {
             if($this->ClusterLayer == false)
             {
+                $rendered .= "console.log('Adding marker " . ($i + 1) . "...');\n";
                 $rendered .= $this->Markers[$i]->Render($mapVariable,$this->ClusterLayer);
                 if ($this->CenterOnPins == true) {
                     $loc = $this->Markers[$i]->RenderLocation();
@@ -197,15 +200,16 @@ class Map extends ViewableData
             }
             
         }
+        $rendered .= "console.log('Markers rendering complete.');\n";
         return $rendered;
     }
     private function RenderInfoBoxCloser()
     {
         $rendered = "";
         for ($i = 0; $i < count($this->Markers); $i++) {
-            $rendered .= "function closePopup(i){
-                InfoBoxCollection[i].close();
-            }";
+            $rendered .= "function closePopup{$i}(){\n";
+            $rendered .= "    if(InfoBoxCollection[$i]) InfoBoxCollection[$i].close();\n";
+            $rendered .= "}\n";
         }
         return $rendered;
     }
@@ -223,17 +227,77 @@ class Map extends ViewableData
     {
         if ($this->ClusterLayer == true) {
             $rendered = "";
+            
+            // Create data source for clustering
+            $rendered .= "var clusterDataSource = new atlas.source.DataSource(null, {
+                cluster: true,
+                clusterRadius: 45,
+                clusterMaxZoom: 15
+            });\n";
+            $rendered .= "{$mapVariable}.sources.add(clusterDataSource);\n";
+            
+            // Add markers to the data source
+            $rendered .= "var clusterPoints = [];\n";
             for ($i = 0; $i < count($this->Markers); $i++) {
-                $output = $this->Markers[$i]->RenderClusterMarker($mapVariable,true);
+                $output = $this->Markers[$i]->RenderClusterMarker($mapVariable, true);
                 $rendered .= $output["rendered"];
                 $loc = $output["pushpinvariable"];
-                $rendered .= "locs.push($loc);\n";
-                
+                $rendered .= "clusterPoints.push($loc);\n";
             }
-
-            // Azure Maps clustering would require a different approach
-            // For now, we'll just add markers normally
-            $rendered .= "// Clustering is not yet implemented for Azure Maps\n";
+            
+            $rendered .= "clusterDataSource.add(clusterPoints);\n";
+            
+            // Create bubble layer for clusters
+            $rendered .= "{$mapVariable}.layers.add(new atlas.layer.BubbleLayer(clusterDataSource, null, {
+                radius: 20,
+                color: '#007faa',
+                strokeColor: 'white',
+                strokeWidth: 2,
+                filter: ['has', 'point_count']
+            }));\n";
+            
+            // Create symbol layer for cluster count labels
+            $rendered .= "{$mapVariable}.layers.add(new atlas.layer.SymbolLayer(clusterDataSource, null, {
+                iconOptions: {
+                    image: 'none'
+                },
+                textOptions: {
+                    textField: ['get', 'point_count_abbreviated'],
+                    offset: [0, 0.4],
+                    color: 'white'
+                },
+                filter: ['has', 'point_count']
+            }));\n";
+            
+            // Create symbol layer for individual points (unclustered)
+            $rendered .= "{$mapVariable}.layers.add(new atlas.layer.SymbolLayer(clusterDataSource, null, {
+                filter: ['!', ['has', 'point_count']],
+                iconOptions: {
+                    image: 'marker-red'
+                }
+            }));\n";
+            
+            // Add click event for clusters to zoom in
+            $rendered .= "{$mapVariable}.events.add('click', clusterDataSource, function(e) {
+                if (e.shapes && e.shapes.length > 0) {
+                    var properties = e.shapes[0].getProperties();
+                    if (properties.cluster) {
+                        // This is a cluster, zoom in
+                        {$mapVariable}.setCamera({
+                            center: e.shapes[0].getCoordinates(),
+                            zoom: {$mapVariable}.getCamera().zoom + 2
+                        });
+                    } else if (properties.popupContent) {
+                        // This is an individual point with popup content
+                        var popup = new atlas.Popup({
+                            content: properties.popupContent,
+                            position: e.shapes[0].getCoordinates()
+                        });
+                        popup.open({$mapVariable});
+                    }
+                }
+            });\n";
+            
             return $rendered;
         }
         return "";
@@ -279,9 +343,80 @@ class Map extends ViewableData
     private function RenderSpatialDataService($mapVariable)
     {
         if ($this->SpatialDataService == true) {
-            // Spatial Data Service for Azure Maps would require different implementation
-            // This feature is not yet implemented for Azure Maps
-            return "// Spatial Data Service is not yet implemented for Azure Maps\n";
+            $rendered = "";
+            
+            // Create data source for boundary polygons
+            $rendered .= "var boundaryDataSource = new atlas.source.DataSource();\n";
+            $rendered .= "{$mapVariable}.sources.add(boundaryDataSource);\n";
+            
+            // Define polygon styling
+            $rendered .= "var polygonLayerOptions = {
+                fillColor: 'rgba(13, 66, 104, 0.5)',
+                strokeColor: '#fff',
+                strokeWidth: 1
+            };\n";
+            
+            $rendered .= "{$mapVariable}.layers.add(new atlas.layer.PolygonLayer(boundaryDataSource, null, polygonLayerOptions));\n";
+            
+            // Function to fetch boundary data using Azure Maps Search API
+            $rendered .= "function fetchBoundaryData(query, entityType) {
+                var searchUrl = 'https://atlas.microsoft.com/search/address/json?api-version=1.0&subscription-key=' + 
+                    '" . SiteConfig::current_site_config()->bingAPIKey . "' + 
+                    '&query=' + encodeURIComponent(query) + 
+                    '&entityType=' + entityType + 
+                    '&limit=1';
+                
+                fetch(searchUrl)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.results && data.results.length > 0) {
+                            var result = data.results[0];
+                            if (result.dataSources && result.dataSources.geometry) {
+                                // Use the geometry ID to fetch polygon data
+                                fetchPolygonData(result.dataSources.geometry.id);
+                            }
+                        }
+                    })
+                    .catch(error => console.error('Error fetching boundary data:', error));
+            }\n";
+            
+            // Function to fetch actual polygon geometry
+            $rendered .= "function fetchPolygonData(geometryId) {
+                var polygonUrl = 'https://atlas.microsoft.com/search/polygon?api-version=1.0&subscription-key=' + 
+                    '" . SiteConfig::current_site_config()->bingAPIKey . "' + 
+                    '&geometries=' + geometryId;
+                
+                fetch(polygonUrl)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.additionalData && data.additionalData.length > 0) {
+                            var polygonData = data.additionalData[0];
+                            if (polygonData.geometryData) {
+                                // Parse and add polygon to map
+                                var coordinates = polygonData.geometryData.coordinates;
+                                if (coordinates && coordinates.length > 0) {
+                                    var polygon = new atlas.data.Polygon(coordinates);
+                                    boundaryDataSource.add(new atlas.data.Feature(polygon));
+                                }
+                            }
+                        }
+                    })
+                    .catch(error => console.error('Error fetching polygon data:', error));
+            }\n";
+            
+            // Execute boundary requests
+            if($this->SpatialDataServicePostalCodes !== null) {
+                $rendered .= "// Fetch boundary for postal code\n";
+                $rendered .= "fetchBoundaryData('".$this->SpatialDataServicePostalCodes."', 'PostalCode');\n";
+            } else {
+                $rendered .= "// Fetch boundaries for marker locations\n";
+                for ($i = 0; $i < count($this->Markers); $i++) {
+                    $location = $this->Markers[$i]->RenderLocation();
+                    $rendered .= "fetchBoundaryData($location, '".$this->SpatialDataServiceType."');\n";
+                }
+            }
+            
+            return $rendered;
         }
         return "";
     }
@@ -304,6 +439,14 @@ class Map extends ViewableData
             return ",\n                zoom: " . $this->Zoom;
         }
         return "";
+    }
+    
+    public function RenderZoomValue()
+    {
+        if ($this->Zoom != null) {
+            return $this->Zoom;
+        }
+        return 10;
     }
     public function RenderMapTypeID()
     {
@@ -334,9 +477,7 @@ class Map extends ViewableData
             $script .= $mapVariable . ".setOptions({{$options}});\n";
         }
         return $script;
-    }
-
-    public function RenderFunction()
+    }    public function RenderFunction()
     {
         $rendered = "";
         $Attributes = "";
@@ -352,11 +493,57 @@ class Map extends ViewableData
         } else {
             $rendered .= "<script type='text/javascript'>\n";
         }
-        $rendered .= "var InfoBoxCollection = [];";
+        
+        $rendered .= "var InfoBoxCollection = [];\n";
+        $rendered .= "console.log('Starting map initialization for map ID: {$this->ID}');\n";
+        
+        // WebGL detection function
+        $rendered .= "function checkWebGLSupport() {\n";
+        $rendered .= "    try {\n";
+        $rendered .= "        var canvas = document.createElement('canvas');\n";
+        $rendered .= "        var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');\n";
+        $rendered .= "        return !!gl;\n";
+        $rendered .= "    } catch (e) {\n";
+        $rendered .= "        return false;\n";
+        $rendered .= "    }\n";
+        $rendered .= "}\n";
+        
+        // Check if API key is available
+        $apiKey = SiteConfig::current_site_config()->bingAPIKey ?? '';
+        if (empty($apiKey)) {
+            $rendered .= "console.error('No API key found! Using OpenLayers fallback.');\n";
+            $rendered .= $this->RenderOpenLayersMap();
+        } else {
+            $rendered .= "console.log('API key found, length: " . strlen($apiKey) . "');\n";
+            
+            // Try Azure Maps first, fallback to OpenLayers if WebGL not supported
+            $rendered .= "if (checkWebGLSupport()) {\n";
+            $rendered .= "    console.log('WebGL supported, using Azure Maps');\n";
+            $rendered .= $this->RenderAzureMap();
+            $rendered .= "} else {\n";
+            $rendered .= "    console.log('WebGL not supported, using OpenLayers fallback');\n";
+            $rendered .= $this->RenderOpenLayersMap();
+            $rendered .= "}\n";
+        }
+        
+        $rendered .= "</script>\n";
+        /*if (!$this->Debug) {
+            $rendered = HelperMethods::MinifyString($rendered);
+        } else {
+            $rendered = HelperMethods::RemoveEmptyLines($rendered);
+        }*/
+
+        return $rendered;
+    }
+    
+    private function RenderAzureMap()
+    {
+        $rendered = "";
         $rendered .= "function GetMap{$this->ID}(){\n";
         $mapVariable = "map" . $this->ID;
 
         $rendered .= "
+            console.log('Creating Azure Map...');
             var $mapVariable = new atlas.Map('MapContainer{$this->ID}',{
                 center:{$this->RenderLocation()}{$this->RenderZoom()}{$this->RenderMapTypeID()},
                 authOptions: {
@@ -364,25 +551,201 @@ class Map extends ViewableData
                     subscriptionKey: '" . SiteConfig::current_site_config()->bingAPIKey . "'
                 }
             });\n
+            console.log('Map created, waiting for ready event...');
         ";
+        
+        // Wait for map to be ready before adding content
+        $rendered .= "{$mapVariable}.events.add('ready', function() {\n";
+        $rendered .= "console.log('Map is ready! Adding content...');\n";
+        
         $rendered .= $this->RenderOptions($mapVariable);
         $rendered .= $this->RenderIcon();
-
         $rendered .= $this->RenderMarkers($mapVariable);
         $rendered .= $this->RenderMapCenteringOnPins($mapVariable);
         $rendered .= $this->RenderClusterLayer($mapVariable);
         $rendered .= $this->RenderSpatialDataService($mapVariable);
         $rendered .= $this->RenderPolygones($mapVariable);
-
+        
+        $rendered .= "});\n"; // Close the ready event
+        
+        // Add error handling with fallback
+        $rendered .= "{$mapVariable}.events.add('error', function(error) {\n";
+        $rendered .= "console.error('Azure Maps error, falling back to OpenLayers:', error);\n";
+        $rendered .= "document.getElementById('MapContainer{$this->ID}').innerHTML = '';\n";
+        $rendered .= $this->RenderOpenLayersMapDirect();
+        $rendered .= "});\n";
+        
+        $rendered .= "console.log('Azure Maps setup complete.');\n";
         $rendered .= "}\n";
         $rendered .= $this->RenderInfoBoxCloser();
-        $rendered .= "</script>\n";
-        if (!$this->Debug) {
-            $rendered = HelperMethods::MinifyString($rendered);
-        } else {
-            $rendered = HelperMethods::RemoveEmptyLines($rendered);
+        $rendered .= "GetMap{$this->ID}();\n";
+        
+        return $rendered;
+    }
+    
+    private function RenderOpenLayersMap()
+    {
+        $rendered = "";
+        $rendered .= "function GetMap{$this->ID}(){\n";
+        $rendered .= $this->RenderOpenLayersMapDirect();
+        $rendered .= "}\n";
+        $rendered .= "GetMap{$this->ID}();\n";
+        
+        return $rendered;
+    }
+    
+    private function RenderOpenLayersMapDirect()
+    {
+        $rendered = "";
+        $mapVariable = "map" . $this->ID;
+        
+        $rendered .= "
+            console.log('Creating OpenLayers Map...');
+            
+            var centerCoords = ol.proj.fromLonLat({$this->RenderLocation()});
+            
+            var {$mapVariable} = new ol.Map({
+                target: 'MapContainer{$this->ID}',
+                layers: [
+                    new ol.layer.Tile({
+                        source: {$this->GetOpenLayersSource()}
+                    })
+                ],
+                view: new ol.View({
+                    center: centerCoords,
+                    zoom: {$this->RenderZoomValue()}
+                })
+            });
+            console.log('OpenLayers map created successfully!');
+        ";
+        
+        if ($this->MouseWheelZoom) {
+            $rendered .= "
+            {$mapVariable}.getInteractions().forEach(function(interaction) {
+                if (interaction instanceof ol.interaction.MouseWheelZoom) {
+                    {$mapVariable}.removeInteraction(interaction);
+                }
+            });
+            ";
         }
-
+        
+        $rendered .= $this->RenderOpenLayersMarkers($mapVariable);
+        $rendered .= "console.log('OpenLayers map setup complete.');\n";
+        
+        return $rendered;
+    }
+    
+    private function GetOpenLayersSource()
+    {
+        switch ($this->MapType) {
+            case "'dark'":
+                return "new ol.source.XYZ({
+                    url: 'https://cartodb-basemaps-{a-c}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png'
+                })";
+            case "'grayscale_light'":
+                return "new ol.source.XYZ({
+                    url: 'https://cartodb-basemaps-{a-c}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png'
+                })";
+            default:
+                return "new ol.source.OSM()";
+        }
+    }
+    
+    private function RenderOpenLayersMarkers($mapVariable)
+    {
+        if (count($this->Markers) == 0) {
+            return "";
+        }
+        
+        $rendered = "";
+        $rendered .= "console.log('Rendering " . count($this->Markers) . " markers with OpenLayers...');\n";
+        $rendered .= "var markerFeatures = [];\n";
+        
+        for ($i = 0; $i < count($this->Markers); $i++) {
+            $marker = $this->Markers[$i];
+            if ($marker->IsValidCoordinate()) {
+                $coords = "[{$marker->GetLongitude()}, {$marker->GetLatitude()}]";
+                $rendered .= "
+                var marker{$i}Coords = ol.proj.fromLonLat($coords);
+                var marker{$i}Feature = new ol.Feature({
+                    geometry: new ol.geom.Point(marker{$i}Coords),
+                    markerId: 'marker{$i}'";
+                
+                // Add popup content if InfoBox exists
+                if ($marker->HasInfoBox()) {
+                    $infoBox = $marker->GetInfoBox();
+                    $content = addslashes($infoBox->GetContent());
+                    $rendered .= ",\n                    popupContent: '$content'";
+                }
+                
+                $rendered .= "
+                });
+                markerFeatures.push(marker{$i}Feature);
+                ";
+            }
+        }
+        
+        $rendered .= "
+        // Create vector layer for markers
+        var vectorSource = new ol.source.Vector({
+            features: markerFeatures
+        });
+        
+        var markerLayer = new ol.layer.Vector({
+            source: vectorSource,
+            style: new ol.style.Style({
+                image: new ol.style.Circle({
+                    radius: 8,
+                    fill: new ol.style.Fill({color: 'red'}),
+                    stroke: new ol.style.Stroke({color: 'white', width: 2})
+                })
+            })
+        });
+        
+        {$mapVariable}.addLayer(markerLayer);
+        ";
+        
+        // Center on pins if enabled
+        if ($this->CenterOnPins && count($this->Markers) > 0) {
+            $rendered .= "
+            if (markerFeatures.length > 0) {
+                var extent = vectorSource.getExtent();
+                {$mapVariable}.getView().fit(extent, {
+                    padding: [{$this->Padding}, {$this->Padding}, {$this->Padding}, {$this->Padding}],
+                    maxZoom: 16
+                });
+            }
+            ";
+        }
+        
+        // Add popup functionality
+        $rendered .= "
+        // Add popup overlay
+        var popup = new ol.Overlay({
+            element: document.createElement('div'),
+            positioning: 'bottom-center',
+            stopEvent: false,
+            offset: [0, -20]
+        });
+        
+        popup.getElement().style.cssText = 'background: white; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); max-width: 200px;';
+        {$mapVariable}.addOverlay(popup);
+        
+        {$mapVariable}.on('click', function(evt) {
+            var feature = {$mapVariable}.forEachFeatureAtPixel(evt.pixel, function(feature) {
+                return feature;
+            });
+            
+            if (feature && feature.get('popupContent')) {
+                popup.getElement().innerHTML = feature.get('popupContent');
+                popup.setPosition(evt.coordinate);
+            } else {
+                popup.setPosition(undefined);
+            }
+        });
+        ";
+        
+        $rendered .= "console.log('OpenLayers markers rendering complete.');\n";
         return $rendered;
     }
 
