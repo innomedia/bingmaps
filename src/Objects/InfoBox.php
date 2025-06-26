@@ -203,7 +203,11 @@ class InfoBox
         ];
     }
     
-    public function GetTitle()
+    /**
+     * Get the title
+     * @return string|null
+     */
+    public function getTitle()
     {
         return $this->Title;
     }

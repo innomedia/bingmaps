@@ -10,6 +10,7 @@ class Marker
     private $IconPath = null;
     private $Base64Icon = null;
     private $IconVariable = null;
+    private $PostalCode = null;
 
     private static $Suffix = "Marker";
 
@@ -43,6 +44,18 @@ class Marker
         $this->IconVariable = Map::GetIconVariable();
         return $this;
     }
+    
+    public function SetPostalCode($postalCode)
+    {
+        $this->PostalCode = $postalCode;
+        return $this;
+    }
+    
+    public function GetPostalCode()
+    {
+        return $this->PostalCode;
+    }
+    
     public function GetMarkerVariable()
     {
         return "marker$this->ID";
@@ -211,10 +224,14 @@ class Marker
         return $this->IconVariable;
     }
     
+    /**
+     * Get the title from the associated InfoBox
+     * @return string|null
+     */
     public function getTitle()
     {
-        if ($this->InfoBox && method_exists($this->InfoBox, 'GetTitle')) {
-            return $this->InfoBox->GetTitle();
+        if ($this->InfoBox && method_exists($this->InfoBox, 'getTitle')) {
+            return $this->InfoBox->getTitle();
         }
         return null;
     }
