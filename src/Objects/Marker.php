@@ -87,40 +87,40 @@ class Marker
         $rendered = "";
         $rendered .= $this->RenderLocationVariable($this->ID, self::$Suffix) . "\n";
         
-        // Create HTML marker with proper Azure Maps syntax
-        $rendered .= "var marker$this->ID = new atlas.HtmlMarker({\n";
-        $rendered .= "    position: {$this->GetLocationVariable($this->ID, self::$Suffix)}";
+        // Create Point feature for datasource
+        $rendered .= "var point$this->ID = new atlas.data.Feature(new atlas.data.Point({$this->GetLocationVariable($this->ID, self::$Suffix)}), {\n";
+        $rendered .= "    markerId: '$this->ID'";
         
-        // Add icon options if available
+        // Add icon properties if available
         if ($this->IconPath != null || $this->Base64Icon != null || $this->IconVariable != null) {
-            $rendered .= ",\n    htmlContent: '<div style=\"background-image: url(";
+            $iconId = '';
             if ($this->IconPath != null) {
-                $rendered .= "$this->IconPath";
+                $iconId = 'icon-' . md5($this->IconPath);
             } elseif ($this->Base64Icon != null) {
-                $rendered .= "$this->Base64Icon";
+                $iconId = 'icon-' . md5($this->Base64Icon);
             } elseif ($this->IconVariable != null) {
-                $rendered .= "' + $this->IconVariable + '";
+                $rendered .= ",\n    iconUrl: $this->IconVariable";
             }
-            $rendered .= ")\"><img src=\"";
-            if ($this->IconPath != null) {
-                $rendered .= "$this->IconPath";
-            } elseif ($this->Base64Icon != null) {
-                $rendered .= "$this->Base64Icon";
-            } elseif ($this->IconVariable != null) {
-                $rendered .= "' + $this->IconVariable + '";
+            if ($iconId !== '') {
+                $rendered .= ",\n    iconUrl: '$iconId'";
             }
-            $rendered .= "\" style=\"display: block;\"></div>'";
+        }
+        
+        if ($this->InfoBox != null) {
+            $content = $this->InfoBox->GetContent();
+            $rendered .= ",\n    popupContent: " . json_encode($content);
         }
         
         $rendered .= "\n});\n";
+        $rendered .= "console.log('Created point feature for marker $this->ID:', point$this->ID);\n";
         
         if ($this->InfoBox != null) {
-            $rendered .= $this->InfoBox->Render($mapVariable, "marker$this->ID");
+            $rendered .= $this->InfoBox->Render($mapVariable, "point$this->ID");
         }
-        if(!$ClusterEnabled)
-        {
-            $rendered .= "{$mapVariable}.markers.add(marker$this->ID);\n";
-        }
+        
+        // Add to datasource instead of markers collection
+        $rendered .= "dataSource.add(point$this->ID);\n";
+        $rendered .= "console.log('Added point$this->ID to dataSource');\n";
         
         return $rendered;
     }
@@ -134,9 +134,25 @@ class Marker
         $rendered = "";
         $rendered .= $this->RenderLocationVariable($this->ID, self::$Suffix) . "\n";
         
-        // For clustering, we need to create a Point feature instead of an HtmlMarker
+        // For clustering, we create a Point feature for the datasource
         $rendered .= "var point$this->ID = new atlas.data.Feature(new atlas.data.Point({$this->GetLocationVariable($this->ID, self::$Suffix)}), {\n";
         $rendered .= "    markerId: '$this->ID'";
+        
+        // Add icon properties if available
+        if ($this->IconPath != null || $this->Base64Icon != null || $this->IconVariable != null) {
+            $iconId = '';
+            if ($this->IconPath != null) {
+                $iconId = 'icon-' . md5($this->IconPath);
+            } elseif ($this->Base64Icon != null) {
+                $iconId = 'icon-' . md5($this->Base64Icon);
+            } elseif ($this->IconVariable != null) {
+                $rendered .= ",\n    iconUrl: $this->IconVariable";
+            }
+            if ($iconId !== '') {
+                $rendered .= ",\n    iconUrl: '$iconId'";
+            }
+        }
+        
         if ($this->InfoBox != null) {
             $content = $this->InfoBox->GetContent();
             $rendered .= ",\n    popupContent: " . json_encode($content);
@@ -146,6 +162,9 @@ class Marker
         if ($this->InfoBox != null) {
             $rendered .= $this->InfoBox->Render($mapVariable, "point$this->ID");
         }
+        
+        // Don't add to datasource here - clustering handles this differently
+        // The point will be added to clusterPoints array in Map.php
         
         $data["rendered"] = $rendered;
         $data["pushpinvariable"] = "point$this->ID";
@@ -176,5 +195,27 @@ class Marker
             $data["infobox"] = $this->GetInfoBoxData();
         }
         return $data;
+    }
+    public function GetIconPath()
+    {
+        return $this->IconPath;
+    }
+    
+    public function GetBase64Icon()
+    {
+        return $this->Base64Icon;
+    }
+    
+    public function GetIconVariable()
+    {
+        return $this->IconVariable;
+    }
+    
+    public function getTitle()
+    {
+        if ($this->InfoBox && method_exists($this->InfoBox, 'GetTitle')) {
+            return $this->InfoBox->GetTitle();
+        }
+        return null;
     }
 }

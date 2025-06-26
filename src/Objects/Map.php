@@ -189,6 +189,131 @@ class Map extends ViewableData
             $rendered .= "var locs = [];\n";
         }
         
+        // Create datasource and layer for non-clustered markers
+        if ($this->ClusterLayer == false && count($this->Markers) > 0) {
+            $rendered .= "console.log('Creating dataSource for non-clustered markers...');\n";
+            $rendered .= "var dataSource = new atlas.source.DataSource();\n";
+            $rendered .= "{$mapVariable}.sources.add(dataSource);\n";
+            $rendered .= "console.log('DataSource added to map');\n";
+            
+            // Collect all unique custom icons that need to be loaded
+            $customIcons = [];
+            for ($i = 0; $i < count($this->Markers); $i++) {
+                $marker = $this->Markers[$i];
+                $iconPath = $marker->GetIconPath();
+                if ($iconPath != null && !in_array($iconPath, $customIcons)) {
+                    $customIcons[] = $iconPath;
+                }
+                $base64Icon = $marker->GetBase64Icon();
+                if ($base64Icon != null && !in_array($base64Icon, $customIcons)) {
+                    $customIcons[] = $base64Icon;
+                }
+            }
+            
+            // If there's a map-level icon, add it too
+            if ($this->IconPath != null && !in_array($this->IconPath, $customIcons)) {
+                $customIcons[] = $this->IconPath;
+            }
+            
+            if (!empty($customIcons)) {
+                $rendered .= "console.log('Loading custom icons...');\n";
+                $rendered .= "var iconsToLoad = " . json_encode($customIcons) . ";\n";
+                $rendered .= "var loadedIcons = 0;\n";
+                $rendered .= "var totalIcons = iconsToLoad.length;\n";
+                
+                // Function to create the symbol layer after all icons are loaded
+                $rendered .= "function createSymbolLayerAfterIconsLoaded() {\n";
+                $rendered .= "    if (loadedIcons === totalIcons) {\n";
+                $rendered .= "        console.log('All custom icons loaded, creating SymbolLayer...');\n";
+                $rendered .= "        var symbolLayer = new atlas.layer.SymbolLayer(dataSource, null, {\n";
+                $rendered .= "            iconOptions: {\n";
+                $rendered .= "                image: ['case',\n";
+                $rendered .= "                    ['has', 'iconUrl'], ['get', 'iconUrl'],\n";
+                if ($this->IconPath != null) {
+                    $rendered .= "                    'icon-" . md5($this->IconPath) . "'\n";
+                } else {
+                    $rendered .= "                    'pin-red'\n";
+                }
+                $rendered .= "                ],\n";
+                $rendered .= "                anchor: 'center',\n";
+                $rendered .= "                allowOverlap: true,\n";
+                $rendered .= "                size: 1.2\n";
+                $rendered .= "            },\n";
+                $rendered .= "            textOptions: {\n";
+                $rendered .= "                textField: ['get', 'title'],\n";
+                $rendered .= "                offset: [0, -2]\n";
+                $rendered .= "            }\n";
+                $rendered .= "        });\n";
+                $rendered .= "        {$mapVariable}.layers.add(symbolLayer);\n";
+                $rendered .= "        console.log('SymbolLayer added to map');\n";
+                
+                // Add click event handler
+                $rendered .= "        {$mapVariable}.events.add('click', symbolLayer, function(e) {\n";
+                $rendered .= "            if (e.shapes && e.shapes.length > 0) {\n";
+                $rendered .= "                var shape = e.shapes[0];\n";
+                $rendered .= "                var properties = shape.getProperties();\n";
+                $rendered .= "                if (properties.popupContent) {\n";
+                $rendered .= "                    var popup = new atlas.Popup({\n";
+                $rendered .= "                        content: properties.popupContent,\n";
+                $rendered .= "                        position: shape.getCoordinates()\n";
+                $rendered .= "                    });\n";
+                $rendered .= "                    popup.open({$mapVariable});\n";
+                $rendered .= "                }\n";
+                $rendered .= "            }\n";
+                $rendered .= "        });\n";
+                $rendered .= "        console.log('Click event handler added for markers');\n";
+                $rendered .= "    }\n";
+                $rendered .= "}\n";
+                
+                // Load each custom icon
+                foreach ($customIcons as $iconPath) {
+                    $iconId = 'icon-' . md5($iconPath);
+                    $rendered .= "{$mapVariable}.imageSprite.add('$iconId', '$iconPath').then(function() {\n";
+                    $rendered .= "    console.log('Loaded custom icon: $iconPath');\n";
+                    $rendered .= "    loadedIcons++;\n";
+                    $rendered .= "    createSymbolLayerAfterIconsLoaded();\n";
+                    $rendered .= "}, function(error) {\n";
+                    $rendered .= "    console.error('Failed to load custom icon $iconPath:', error);\n";
+                    $rendered .= "    loadedIcons++;\n";
+                    $rendered .= "    createSymbolLayerAfterIconsLoaded();\n";
+                    $rendered .= "});\n";
+                }
+            } else {
+                // No custom icons, create symbol layer immediately with default icon
+                $rendered .= "console.log('No custom icons, creating SymbolLayer with default icon...');\n";
+                $rendered .= "var symbolLayer = new atlas.layer.SymbolLayer(dataSource, null, {\n";
+                $rendered .= "    iconOptions: {\n";
+                $rendered .= "        image: 'pin-red',\n";
+                $rendered .= "        anchor: 'center',\n";
+                $rendered .= "        allowOverlap: true,\n";
+                $rendered .= "        size: 1.2\n";
+                $rendered .= "    },\n";
+                $rendered .= "    textOptions: {\n";
+                $rendered .= "        textField: ['get', 'title'],\n";
+                $rendered .= "        offset: [0, -2]\n";
+                $rendered .= "    }\n";
+                $rendered .= "});\n";
+                $rendered .= "{$mapVariable}.layers.add(symbolLayer);\n";
+                $rendered .= "console.log('SymbolLayer added to map');\n";
+                
+                // Add click event handler
+                $rendered .= "{$mapVariable}.events.add('click', symbolLayer, function(e) {\n";
+                $rendered .= "    if (e.shapes && e.shapes.length > 0) {\n";
+                $rendered .= "        var shape = e.shapes[0];\n";
+                $rendered .= "        var properties = shape.getProperties();\n";
+                $rendered .= "        if (properties.popupContent) {\n";
+                $rendered .= "            var popup = new atlas.Popup({\n";
+                $rendered .= "                content: properties.popupContent,\n";
+                $rendered .= "                position: shape.getCoordinates()\n";
+                $rendered .= "            });\n";
+                $rendered .= "            popup.open({$mapVariable});\n";
+                $rendered .= "        }\n";
+                $rendered .= "    }\n";
+                $rendered .= "});\n";
+                $rendered .= "console.log('Click event handler added for markers');\n";
+            }
+        }
+        
         for ($i = 0; $i < count($this->Markers); $i++) {
             if($this->ClusterLayer == false)
             {
@@ -229,6 +354,25 @@ class Map extends ViewableData
     {
         if ($this->ClusterLayer == true) {
             $rendered = "";
+            
+            // Collect all unique custom icons that need to be loaded for clustering
+            $customIcons = [];
+            for ($i = 0; $i < count($this->Markers); $i++) {
+                $marker = $this->Markers[$i];
+                $iconPath = $marker->GetIconPath();
+                if ($iconPath != null && !in_array($iconPath, $customIcons)) {
+                    $customIcons[] = $iconPath;
+                }
+                $base64Icon = $marker->GetBase64Icon();
+                if ($base64Icon != null && !in_array($base64Icon, $customIcons)) {
+                    $customIcons[] = $base64Icon;
+                }
+            }
+            
+            // If there's a map-level icon, add it too
+            if ($this->IconPath != null && !in_array($this->IconPath, $customIcons)) {
+                $customIcons[] = $this->IconPath;
+            }
             
             // Create data source for clustering
             $rendered .= "var clusterDataSource = new atlas.source.DataSource(null, {
@@ -293,82 +437,95 @@ class Map extends ViewableData
             }));\n";
             $rendered .= "console.log('Symbol layer added for cluster counts');\n";
             
-            // Create symbol layer for individual points (unclustered)
-            $iconImage = 'pin-round-blue'; // Default icon
-            if ($this->IconPath != null) {
-                // If custom icon is set, we need to load it as an image template
-                $rendered .= "
-                // Load custom icon image and create symbol layer when ready
-                {$mapVariable}.imageSprite.add('custom-marker', '{$this->IconPath}').then(function() {
-                    console.log('Custom icon loaded successfully');
-                    // Create symbol layer for individual points after icon is loaded
-                    var unclusteredLayer = new atlas.layer.SymbolLayer(clusterDataSource, null, {
-                        filter: ['!', ['has', 'point_count']],
-                        iconOptions: {
-                            image: 'custom-marker',
-                            size: 1.0,
-                            anchor: 'center'
-                        }
-                    });
-                    {$mapVariable}.layers.add(unclusteredLayer);
-                    console.log('Symbol layer added for individual points with custom icon');
-                }, function(error) {
-                    console.error('Failed to load custom icon:', error);
-                    // Fallback to default icon if custom icon fails to load
-                    var unclusteredLayer = new atlas.layer.SymbolLayer(clusterDataSource, null, {
-                        filter: ['!', ['has', 'point_count']],
-                        iconOptions: {
-                            image: 'pin-round-blue',
-                            size: 1.0,
-                            anchor: 'center'
-                        }
-                    });
-                    {$mapVariable}.layers.add(unclusteredLayer);
-                    console.log('Symbol layer added for individual points with fallback icon');
-                });
-                ";
+            if (!empty($customIcons)) {
+                $rendered .= "console.log('Loading custom icons for clustering...');\n";
+                $rendered .= "var clusterIconsToLoad = " . json_encode($customIcons) . ";\n";
+                $rendered .= "var clusterLoadedIcons = 0;\n";
+                $rendered .= "var clusterTotalIcons = clusterIconsToLoad.length;\n";
+                
+                // Function to create unclustered layer after all icons are loaded
+                $rendered .= "function createUnclusteredLayerAfterIconsLoaded() {\n";
+                $rendered .= "    if (clusterLoadedIcons === clusterTotalIcons) {\n";
+                $rendered .= "        console.log('All cluster icons loaded, creating unclustered layer...');\n";
+                
+                // Create symbol layer for individual points (unclustered)
+                $rendered .= "        var unclusteredLayer = new atlas.layer.SymbolLayer(clusterDataSource, null, {\n";
+                $rendered .= "            filter: ['!', ['has', 'point_count']],\n";
+                $rendered .= "            iconOptions: {\n";
+                $rendered .= "                image: ['case',\n";
+                $rendered .= "                    ['has', 'iconUrl'], ['get', 'iconUrl'],\n";
+                if ($this->IconPath != null) {
+                    $iconId = 'icon-' . md5($this->IconPath);
+                    $rendered .= "                    '$iconId'\n";
+                } else {
+                    $rendered .= "                    'pin-red'\n";
+                }
+                $rendered .= "                ],\n";
+                $rendered .= "                size: 1.0,\n";
+                $rendered .= "                anchor: 'center'\n";
+                $rendered .= "            }\n";
+                $rendered .= "        });\n";
+                $rendered .= "        {$mapVariable}.layers.add(unclusteredLayer);\n";
+                $rendered .= "        console.log('Symbol layer added for individual points with custom icons');\n";
+                $rendered .= "    }\n";
+                $rendered .= "}\n";
+                
+                // Load each custom icon
+                foreach ($customIcons as $iconPath) {
+                    $iconId = 'icon-' . md5($iconPath);
+                    $rendered .= "{$mapVariable}.imageSprite.add('$iconId', '$iconPath').then(function() {\n";
+                    $rendered .= "    console.log('Loaded cluster icon: $iconPath');\n";
+                    $rendered .= "    clusterLoadedIcons++;\n";
+                    $rendered .= "    createUnclusteredLayerAfterIconsLoaded();\n";
+                    $rendered .= "}, function(error) {\n";
+                    $rendered .= "    console.error('Failed to load cluster icon $iconPath:', error);\n";
+                    $rendered .= "    clusterLoadedIcons++;\n";
+                    $rendered .= "    createUnclusteredLayerAfterIconsLoaded();\n";
+                    $rendered .= "});\n";
+                }
             } else {
-                $rendered .= "{$mapVariable}.layers.add(new atlas.layer.SymbolLayer(clusterDataSource, null, {
-                    filter: ['!', ['has', 'point_count']],
-                    iconOptions: {
-                        image: 'pin-round-blue',
-                        size: 1.0,
-                        anchor: 'center'
-                    }
-                }));\n";
+                // No custom icons, create unclustered layer immediately with default icon
+                $rendered .= "{$mapVariable}.layers.add(new atlas.layer.SymbolLayer(clusterDataSource, null, {\n";
+                $rendered .= "    filter: ['!', ['has', 'point_count']],\n";
+                $rendered .= "    iconOptions: {\n";
+                $rendered .= "        image: 'pin-red',\n";
+                $rendered .= "        size: 1.0,\n";
+                $rendered .= "        anchor: 'center'\n";
+                $rendered .= "    }\n";
+                $rendered .= "}));\n";
                 $rendered .= "console.log('Symbol layer added for individual points with default icon');\n";
             }
             
             // Add click event for clusters to zoom in
-            $rendered .= "{$mapVariable}.events.add('click', clusterDataSource, function(e) {
-                if (e.shapes && e.shapes.length > 0) {
-                    var properties = e.shapes[0].getProperties();
-                    if (properties.cluster) {
-                        // This is a cluster, zoom in
-                        {$mapVariable}.setCamera({
-                            center: e.shapes[0].getCoordinates(),
-                            zoom: {$mapVariable}.getCamera().zoom + 2
-                        });
-                    } else if (properties.popupContent) {
-                        // This is an individual point with popup content
-                        var popup = new atlas.Popup({
-                            content: properties.popupContent,
-                            position: e.shapes[0].getCoordinates()
-                        });
-                        popup.open({$mapVariable});
-                    }
-                }
-            });\n";
+            $rendered .= "{$mapVariable}.events.add('click', clusterDataSource, function(e) {\n";
+            $rendered .= "    if (e.shapes && e.shapes.length > 0) {\n";
+            $rendered .= "        var properties = e.shapes[0].getProperties();\n";
+            $rendered .= "        if (properties.cluster) {\n";
+            $rendered .= "            // This is a cluster, zoom in\n";
+            $rendered .= "            {$mapVariable}.setCamera({\n";
+            $rendered .= "                center: e.shapes[0].getCoordinates(),\n";
+            $rendered .= "                zoom: {$mapVariable}.getCamera().zoom + 2\n";
+            $rendered .= "            });\n";
+            $rendered .= "        } else if (properties.popupContent) {\n";
+            $rendered .= "            // This is an individual point with popup content\n";
+            $rendered .= "            var popup = new atlas.Popup({\n";
+            $rendered .= "                content: properties.popupContent,\n";
+            $rendered .= "                position: e.shapes[0].getCoordinates()\n";
+            $rendered .= "            });\n";
+            $rendered .= "            popup.open({$mapVariable});\n";
+            $rendered .= "        }\n";
+            $rendered .= "    }\n";
+            $rendered .= "});\n";
             
             // Add mouse enter event to change cursor
-            $rendered .= "{$mapVariable}.events.add('mouseenter', clusterDataSource, function() {
-                {$mapVariable}.getCanvasContainer().style.cursor = 'pointer';
-            });\n";
+            $rendered .= "{$mapVariable}.events.add('mouseenter', clusterDataSource, function() {\n";
+            $rendered .= "    {$mapVariable}.getCanvasContainer().style.cursor = 'pointer';\n";
+            $rendered .= "});\n";
             
             // Add mouse leave event to reset cursor
-            $rendered .= "{$mapVariable}.events.add('mouseleave', clusterDataSource, function() {
-                {$mapVariable}.getCanvasContainer().style.cursor = 'grab';
-            });\n";
+            $rendered .= "{$mapVariable}.events.add('mouseleave', clusterDataSource, function() {\n";
+            $rendered .= "    {$mapVariable}.getCanvasContainer().style.cursor = 'grab';\n";
+            $rendered .= "});\n";
             
             $rendered .= "console.log('Azure Maps clustering setup complete - all layers and events configured');\n";
             
@@ -379,37 +536,99 @@ class Map extends ViewableData
     private function RenderPolygones($mapVariable){
         if($this->PolygoneData && $this->PolygoneData !== '' && count($this->PolygoneData) > 0){
             $rendered = "";
+            
+            $rendered .= "console.log('Setting up polygon overlays - ' + " . count($this->PolygoneData) . " + ' polygons to render');\n";
+            
+            // Create a single datasource for all custom polygons
+            $rendered .= "var polygonDataSource = new atlas.source.DataSource('polygon-data-source');\n";
+            $rendered .= "{$mapVariable}.sources.add(polygonDataSource);\n";
+            
+            // Collect all polygon features
+            $rendered .= "var polygonFeatures = [];\n";
+            
             for ($i = 0; $i < count($this->PolygoneData); $i++){
                 if($this->PolygoneData[$i] !== ''){
                     $rendered .= "
-                    var exteriorRing = [
-                    ";
+                    // Polygon {$i}
+                    var exteriorRing{$i} = [";
+                        
+                        $coordCount = 0;
                         for ($j = 0; $j < count($this->PolygoneData[$i]['Coords']); $j++){
                             if($this->PolygoneData[$i]['Coords'][$j] &&
                                 $this->PolygoneData[$i]['Coords'][$j] !== '' &&
                                 $this->PolygoneData[$i]['Coords'][$j]->IsValid()){
-                                $rendered .= "[{$this->PolygoneData[$i]['Coords'][$j]->GetLongitude()}, {$this->PolygoneData[$i]['Coords'][$j]->GetLatitude()}],
-                            ";
+                                $rendered .= "[{$this->PolygoneData[$i]['Coords'][$j]->GetLongitude()}, {$this->PolygoneData[$i]['Coords'][$j]->GetLatitude()}],";
+                                $coordCount++;
                             }
                         }
-                        $rendered .= "
-                    ];
+                        
+                        $rendered .= "];
                     
-                    var polygon{$i} = new atlas.data.Polygon([exteriorRing]);
-                    var polygonFeature{$i} = new atlas.data.Feature(polygon{$i}, {});
-                    
-                    var dataSource{$i} = new atlas.source.DataSource();
-                    {$mapVariable}.sources.add(dataSource{$i});
-                    dataSource{$i}.add(polygonFeature{$i});
-                    
-                    {$mapVariable}.layers.add(new atlas.layer.PolygonLayer(dataSource{$i}, null, {
-                        fillColor: '{$this->PolygoneData[$i]['Colors']['Background']}',
-                        strokeColor: '{$this->PolygoneData[$i]['Colors']['Stroke']}',
-                        strokeWidth: 2
-                    }));
+                    if (exteriorRing{$i}.length >= 3) {
+                        var polygon{$i} = new atlas.data.Polygon([exteriorRing{$i}]);
+                        var polygonFeature{$i} = new atlas.data.Feature(polygon{$i}, {
+                            polygonId: {$i},
+                            fillColor: '{$this->PolygoneData[$i]['Colors']['Background']}',
+                            strokeColor: '{$this->PolygoneData[$i]['Colors']['Stroke']}',
+                            source: 'custom-polygon'
+                        });
+                        polygonFeatures.push(polygonFeature{$i});
+                        console.log('Polygon {$i} prepared with ' + exteriorRing{$i}.length + ' coordinates');
+                    } else {
+                        console.warn('Polygon {$i} has insufficient coordinates (' + exteriorRing{$i}.length + '), skipping');
+                    }
                     ";
                 }
             }
+            
+            // Add all polygon features to the datasource at once
+            $rendered .= "
+            if (polygonFeatures.length > 0) {
+                polygonDataSource.add(polygonFeatures);
+                console.log('Added ' + polygonFeatures.length + ' polygon features to datasource');
+                
+                // Create polygon layer with data-driven styling
+                var polygonLayer = new atlas.layer.PolygonLayer(polygonDataSource, 'custom-polygon-layer', {
+                    fillColor: [
+                        'case',
+                        ['has', 'fillColor'],
+                        ['get', 'fillColor'],
+                        'rgba(13, 66, 104, 0.5)' // default fill color
+                    ],
+                    strokeColor: [
+                        'case',
+                        ['has', 'strokeColor'],
+                        ['get', 'strokeColor'],
+                        '#0d4268' // default stroke color
+                    ],
+                    strokeWidth: 2,
+                    strokeOpacity: 0.8,
+                    fillOpacity: 0.6
+                });
+                
+                {$mapVariable}.layers.add(polygonLayer);
+                console.log('Custom polygon layer added to map');
+                
+                // Add click event for polygon interactions
+                {$mapVariable}.events.add('click', polygonLayer, function(e) {
+                    if (e.shapes && e.shapes.length > 0) {
+                        var properties = e.shapes[0].getProperties();
+                        console.log('Custom polygon clicked:', properties);
+                        
+                        var popup = new atlas.Popup({
+                            content: '<div style=\"padding: 10px;\"><strong>Custom Polygon</strong><br/>ID: ' + (properties.polygonId !== undefined ? properties.polygonId : 'Unknown') + '</div>',
+                            position: e.position
+                        });
+                        popup.open({$mapVariable});
+                    }
+                });
+            } else {
+                console.warn('No valid polygon features to add');
+            }
+            ";
+            
+            $rendered .= "console.log('Polygon overlays setup complete');\n";
+            
             return $rendered;
         }
         return "";
@@ -419,76 +638,123 @@ class Map extends ViewableData
         if ($this->SpatialDataService == true) {
             $rendered = "";
             
-            // Create data source for boundary polygons
-            $rendered .= "var boundaryDataSource = new atlas.source.DataSource();\n";
-            $rendered .= "{$mapVariable}.sources.add(boundaryDataSource);\n";
+            $rendered .= "console.log('Setting up Azure Maps Spatial Data Service with PHP backend...');\n";
             
-            // Define polygon styling
-            $rendered .= "var polygonLayerOptions = {
-                fillColor: 'rgba(13, 66, 104, 0.5)',
-                strokeColor: '#fff',
-                strokeWidth: 1
+            // Create data source for boundary polygons
+            $rendered .= "var spatialDataSource = new atlas.source.DataSource('spatial-data-source');\n";
+            $rendered .= "{$mapVariable}.sources.add(spatialDataSource);\n";
+            $rendered .= "console.log('Spatial data source created and added to map');\n";
+            
+            // Define polygon styling with better visual hierarchy
+            $rendered .= "var spatialPolygonLayerOptions = {
+                fillColor: 'rgba(13, 66, 104, 0.3)',
+                fillOpacity: 0.3,
+                strokeColor: '#0d4268',
+                strokeWidth: 2,
+                strokeOpacity: 0.8
             };\n";
             
-            $rendered .= "{$mapVariable}.layers.add(new atlas.layer.PolygonLayer(boundaryDataSource, null, polygonLayerOptions));\n";
+            // Create the polygon layer for spatial boundaries
+            $rendered .= "var spatialPolygonLayer = new atlas.layer.PolygonLayer(spatialDataSource, 'spatial-polygon-layer', spatialPolygonLayerOptions);\n";
+            $rendered .= "{$mapVariable}.layers.add(spatialPolygonLayer);\n";
+            $rendered .= "console.log('Spatial polygon layer created and added to map');\n";
             
-            // Function to fetch boundary data using Azure Maps Search API
-            $rendered .= "function fetchBoundaryData(query, entityType) {
-                var searchUrl = 'https://atlas.microsoft.com/search/address/json?api-version=1.0&subscription-key=' + 
-                    '" . SiteConfig::current_site_config()->bingAPIKey . "' + 
-                    '&query=' + encodeURIComponent(query) + 
-                    '&entityType=' + entityType + 
-                    '&limit=1';
+            // Fetch spatial data using PHP service (server-side with caching)
+            $spatialService = new \bingMap\SpatialDataService();
+            $polygonFeatures = [];
+            
+            if ($this->SpatialDataServicePostalCodes !== null) {
+                // Fetch boundary for specific postal code
+                $polygonData = $spatialService->getBoundaryForPostalCode(
+                    $this->SpatialDataServicePostalCodes, 
+                    "Postal Code: {$this->SpatialDataServicePostalCodes}"
+                );
                 
-                fetch(searchUrl)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.results && data.results.length > 0) {
-                            var result = data.results[0];
-                            if (result.dataSources && result.dataSources.geometry) {
-                                // Use the geometry ID to fetch polygon data
-                                fetchPolygonData(result.dataSources.geometry.id);
-                            }
-                        }
-                    })
-                    .catch(error => console.error('Error fetching boundary data:', error));
-            }\n";
-            
-            // Function to fetch actual polygon geometry
-            $rendered .= "function fetchPolygonData(geometryId) {
-                var polygonUrl = 'https://atlas.microsoft.com/search/polygon?api-version=1.0&subscription-key=' + 
-                    '" . SiteConfig::current_site_config()->bingAPIKey . "' + 
-                    '&geometries=' + geometryId;
-                
-                fetch(polygonUrl)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.additionalData && data.additionalData.length > 0) {
-                            var polygonData = data.additionalData[0];
-                            if (polygonData.geometryData) {
-                                // Parse and add polygon to map
-                                var coordinates = polygonData.geometryData.coordinates;
-                                if (coordinates && coordinates.length > 0) {
-                                    var polygon = new atlas.data.Polygon(coordinates);
-                                    boundaryDataSource.add(new atlas.data.Feature(polygon));
-                                }
-                            }
-                        }
-                    })
-                    .catch(error => console.error('Error fetching polygon data:', error));
-            }\n";
-            
-            // Execute boundary requests
-            if($this->SpatialDataServicePostalCodes !== null) {
-                $rendered .= "// Fetch boundary for postal code\n";
-                $rendered .= "fetchBoundaryData('".$this->SpatialDataServicePostalCodes."', 'PostalCode');\n";
+                if ($polygonData) {
+                    $polygonFeatures[] = $polygonData;
+                }
             } else {
-                $rendered .= "// Fetch boundaries for marker locations\n";
+                // Fetch boundaries for marker locations
                 for ($i = 0; $i < count($this->Markers); $i++) {
-                    $location = $this->Markers[$i]->RenderLocation();
-                    $rendered .= "fetchBoundaryData($location, '".$this->SpatialDataServiceType."');\n";
+                    $coords = $this->Markers[$i]->GetPosition();
+                    if ($coords && $coords->IsValid()) {
+                        $lat = $coords->GetLatitude();
+                        $lng = $coords->GetLongitude();
+                        $markerTitle = $this->Markers[$i]->getTitle() ?? "Location " . ($i + 1);
+                        
+                        $polygonData = $spatialService->getBoundaryForCoordinates(
+                            $lat, 
+                            $lng, 
+                            $this->SpatialDataServiceType, 
+                            "Boundary for: {$markerTitle}"
+                        );
+                        
+                        if ($polygonData) {
+                            $polygonFeatures[] = $polygonData;
+                        }
+                    }
                 }
             }
+            
+            // Add polygon features to the map if any were found
+            if (!empty($polygonFeatures)) {
+                $rendered .= "console.log('Adding " . count($polygonFeatures) . " pre-fetched spatial boundaries...');\n";
+                $rendered .= "var spatialFeatures = [];\n";
+                
+                foreach ($polygonFeatures as $index => $feature) {
+                    $coordinatesJson = json_encode($feature['coordinates']);
+                    $description = addslashes($feature['description']);
+                    $geometryId = $feature['geometryId'];
+                    
+                    $rendered .= "
+                    // Spatial feature {$index}: {$description}
+                    try {
+                        var coordinates{$index} = {$coordinatesJson};
+                        var polygon{$index} = new atlas.data.Polygon(coordinates{$index});
+                        var spatialFeature{$index} = new atlas.data.Feature(polygon{$index}, {
+                            description: '{$description}',
+                            geometryId: '{$geometryId}',
+                            source: 'spatial-data-service',
+                            featureIndex: {$index}
+                        });
+                        spatialFeatures.push(spatialFeature{$index});
+                        console.log('Prepared spatial feature {$index}: {$description}');
+                    } catch (error) {
+                        console.error('Error preparing spatial feature {$index}:', error);
+                    }
+                    ";
+                }
+                
+                $rendered .= "
+                // Add all spatial features to the data source
+                if (spatialFeatures.length > 0) {
+                    spatialDataSource.add(spatialFeatures);
+                    console.log('Added ' + spatialFeatures.length + ' spatial boundary features to map');
+                } else {
+                    console.warn('No valid spatial features to add');
+                }
+                ";
+            } else {
+                $rendered .= "console.log('No spatial boundary data available');\n";
+            }
+            
+            // Add click event handler for spatial polygons
+            $rendered .= "{$mapVariable}.events.add('click', spatialPolygonLayer, function(e) {
+                if (e.shapes && e.shapes.length > 0) {
+                    var properties = e.shapes[0].getProperties();
+                    console.log('Spatial polygon clicked:', properties);
+                    
+                    if (properties.description) {
+                        var popup = new atlas.Popup({
+                            content: '<div style=\"padding: 10px;\"><strong>Boundary:</strong><br/>' + properties.description + '</div>',
+                            position: e.position
+                        });
+                        popup.open({$mapVariable});
+                    }
+                }
+            });\n";
+            
+            $rendered .= "console.log('Azure Maps Spatial Data Service setup complete (PHP backend)');\n";
             
             return $rendered;
         }

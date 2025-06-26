@@ -1,0 +1,10 @@
+---
+Name: azuremaps-cache
+After: '#corecache'
+---
+SilverStripe\Core\Injector\Injector:
+  Psr\SimpleCache\CacheInterface.AzureMapsSpatialCache:
+    factory: SilverStripe\Core\Cache\CacheFactory
+    constructor:
+      namespace: "AzureMapsSpatialCache"
+      defaultLifetime: 86400

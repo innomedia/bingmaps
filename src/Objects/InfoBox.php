@@ -142,16 +142,29 @@ class InfoBox
             // Use json_encode to properly escape the content for JavaScript
             $contentJson = json_encode($content);
             
-            $rendered .= "var popup$this->ID = new atlas.Popup({
-                position: {$this->GetLocationVariable($this->ID,self::$Suffix)},
-                content: $contentJson
-            });
-            InfoBoxCollection.push(popup$this->ID);
-            {$mapVariable}.popups.add(popup$this->ID);
-            {$mapVariable}.events.add('click', $markerVariable, function() {
-                popup{$this->ID}.open({$mapVariable});
-            });
-            ";
+            // Check if this is a Point feature (starts with "point") or an HtmlMarker
+            if (strpos($markerVariable, 'point') === 0) {
+                // For Point features, we don't attach events here - they'll be handled by the layer
+                $rendered .= "var popup$this->ID = new atlas.Popup({
+                    position: {$this->GetLocationVariable($this->ID,self::$Suffix)},
+                    content: $contentJson
+                });
+                InfoBoxCollection.push(popup$this->ID);
+                // Note: Click events for Point features are handled by the layer, not individual features
+                ";
+            } else {
+                // Original behavior for HtmlMarkers
+                $rendered .= "var popup$this->ID = new atlas.Popup({
+                    position: {$this->GetLocationVariable($this->ID,self::$Suffix)},
+                    content: $contentJson
+                });
+                InfoBoxCollection.push(popup$this->ID);
+                {$mapVariable}.popups.add(popup$this->ID);
+                {$mapVariable}.events.add('click', $markerVariable, function() {
+                    popup{$this->ID}.open({$mapVariable});
+                });
+                ";
+            }
             
             return $rendered;
         }
@@ -188,5 +201,10 @@ class InfoBox
             "htmlContent"   =>  $this->getRenderedHTMLContent(),
             "coordinates"   => $this->GetPosition()->GetReactData()
         ];
+    }
+    
+    public function GetTitle()
+    {
+        return $this->Title;
     }
 }
