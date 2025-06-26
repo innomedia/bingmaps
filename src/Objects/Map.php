@@ -66,6 +66,10 @@ class Map extends ViewableData
     private $ShowCompass = true;
     private $ShowPitchToggle = true;
     private $ShowStylePicker = true;
+    private $ShowFullscreenControl = false;
+    private $ZoomButtonsPosition = "top-right";
+    private $CompassPosition = "bottom-right";
+    private $MarkerAnchor = "bottom";
     /*
       • AdminDivision1: First administrative level within the country/region level, such as a state or a province.
   • AdminDivision2: Second administrative level within the country/region level, such as a county.
@@ -225,6 +229,45 @@ class Map extends ViewableData
         $this->ShowStylePicker = false;
         return $this;
     }
+    
+    /**
+     * Enable fullscreen control
+     */
+    public function ShowFullscreenControl()
+    {
+        $this->ShowFullscreenControl = true;
+        return $this;
+    }
+    
+    /**
+     * Set position for zoom buttons control
+     * @param string $position Position for zoom control ('top-left', 'top-right', 'bottom-left', 'bottom-right')
+     */
+    public function SetZoomButtonsPosition($position)
+    {
+        $this->ZoomButtonsPosition = $position;
+        return $this;
+    }
+    
+    /**
+     * Set position for compass control
+     * @param string $position Position for compass control ('top-left', 'top-right', 'bottom-left', 'bottom-right')
+     */
+    public function SetCompassPosition($position)
+    {
+        $this->CompassPosition = $position;
+        return $this;
+    }
+    
+    /**
+     * Set marker icon anchor position
+     * @param string $anchor Anchor position ('center', 'top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right')
+     */
+    public function SetMarkerAnchor($anchor)
+    {
+        $this->MarkerAnchor = $anchor;
+        return $this;
+    }
     public function SetIcon($IconPath)
     {
         $this->IconPath = $IconPath;
@@ -358,7 +401,7 @@ class Map extends ViewableData
                     $rendered .= "                    'pin-red'\n";
                 }
                 $rendered .= "                ],\n";
-                $rendered .= "                anchor: 'center',\n";
+                $rendered .= "                anchor: '{$this->MarkerAnchor}',\n";
                 $rendered .= "                allowOverlap: true,\n";
                 $rendered .= "                size: 1.2\n";
                 $rendered .= "            },\n";
@@ -407,7 +450,7 @@ class Map extends ViewableData
                 $rendered .= "var symbolLayer = new atlas.layer.SymbolLayer(dataSource, null, {\n";
                 $rendered .= "    iconOptions: {\n";
                 $rendered .= "        image: 'pin-red',\n";
-                $rendered .= "        anchor: 'center',\n";
+                $rendered .= "        anchor: '{$this->MarkerAnchor}',\n";
                 $rendered .= "        allowOverlap: true,\n";
                 $rendered .= "        size: 1.2\n";
                 $rendered .= "    },\n";
@@ -589,7 +632,7 @@ class Map extends ViewableData
                 }
                 $rendered .= "                ],\n";
                 $rendered .= "                size: 1.0,\n";
-                $rendered .= "                anchor: 'center'\n";
+                $rendered .= "                anchor: '{$this->MarkerAnchor}'\n";
                 $rendered .= "            }\n";
                 $rendered .= "        });\n";
                 $rendered .= "        {$mapVariable}.layers.add(unclusteredLayer);\n";
@@ -617,7 +660,7 @@ class Map extends ViewableData
                 $rendered .= "    iconOptions: {\n";
                 $rendered .= "        image: 'pin-red',\n";
                 $rendered .= "        size: 1.0,\n";
-                $rendered .= "        anchor: 'center'\n";
+                $rendered .= "        anchor: '{$this->MarkerAnchor}'\n";
                 $rendered .= "    }\n";
                 $rendered .= "}));\n";
                 $rendered .= $this->debugLog("Symbol layer added for individual points with default icon");
@@ -758,12 +801,30 @@ class Map extends ViewableData
         return "";
     }
 
-    
-
-    private function RenderSpatialDataService($mapVariable)
+      private function RenderSpatialDataService($mapVariable)
     {
         if ($this->SpatialDataService == true) {
-
+            /*
+            // Debug: Test getPolygonForCoordinate for the first marker
+            if (!empty($this->Markers)) {
+                $firstMarker = $this->Markers[0];
+                if ($firstMarker->HasPosition()) {
+                    $latitude = $firstMarker->GetLatitude();
+                    $longitude = $firstMarker->GetLongitude();
+                    error_log("Debug: About to call getPolygonForCoordinate with lat: $latitude, lng: $longitude");
+                    $polygonResult = $this->getPolygonForCoordinate($latitude, $longitude);
+                    Debug::dump([
+                        'latitude' => $latitude,
+                        'longitude' => $longitude,
+                        'polygonResult' => $polygonResult
+                    ]);
+                } else {
+                    //Debug::dump('First marker has no position');
+                }
+            } else {
+                Debug::dump('No markers found');
+            }*/
+            
             $rendered = "";
 
             $rendered .= "var geoDataRequestOptions = {
@@ -897,26 +958,11 @@ class Map extends ViewableData
             $script .= $this->debugLog("User interaction options applied");
         }
         
-        // Handle control visibility
-        if (!$this->ShowZoomButtons) {
-            $script .= "{$mapVariable}.controls.remove('zoom');\n";
-        }
+        // Handle control visibility - add controls that should be shown
+        $script .= $this->debugLog("Adding Azure Maps controls");
         
-        if (!$this->ShowCompass) {
-            $script .= "{$mapVariable}.controls.remove('compass');\n";
-        }
-        
-        if (!$this->ShowPitchToggle) {
-            $script .= "{$mapVariable}.controls.remove('pitch');\n";
-        }
-        
-        if (!$this->ShowStylePicker) {
-            $script .= "{$mapVariable}.controls.remove('style');\n";
-        }
-        
-        if (!$this->ShowZoomButtons || !$this->ShowCompass || !$this->ShowPitchToggle || !$this->ShowStylePicker) {
-            $script .= $this->debugLog("Map controls configured");
-        }
+        // Add map controls
+        $script .= $this->AddCustomControls($mapVariable);
         
         return $script;
     }
@@ -1131,15 +1177,11 @@ class Map extends ViewableData
         $reverseParams = [
             'api-version' => '1.0',
             'subscription-key' => $apiKey,
-            'query' => $latitude . ',' . $longitude,
-            'returnSpeedLimit' => false,
-            'returnRoadUse' => false,
-            'allowFreeformNewline' => false
+            'query' => $latitude . ',' . $longitude
         ];
         
         error_log("Getting address for coordinate: $latitude, $longitude");
         $reverseResponse = $this->makeHttpRequest($reverseGeoUrl, $reverseParams);
-        
         if (!$reverseResponse || !isset($reverseResponse['addresses']) || empty($reverseResponse['addresses'])) {
             error_log("Failed to get address for coordinate: $latitude, $longitude");
             return null;
@@ -1425,5 +1467,134 @@ class Map extends ViewableData
         }
         
         return $results;
+    }
+    
+    /**
+     * Make HTTP request to external API
+     * @param string $url The URL to request
+     * @param array $params Query parameters to include in the request
+     * @param string $method HTTP method (GET or POST)
+     * @return array|null Decoded JSON response or null on failure
+     */
+    private function makeHttpRequest($url, $params = [], $method = 'GET')
+    {
+        // Build query string for GET requests or URL with params
+        if ($method === 'GET' && !empty($params)) {
+            $url .= '?' . http_build_query($params);
+        }
+        
+        // Initialize cURL
+        $ch = curl_init();
+        
+        // Set cURL options
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 3,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_USERAGENT => 'Azure Maps SilverStripe Integration/1.0',
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/json',
+                'Content-Type: application/json'
+            ]
+        ]);
+        
+        // Handle POST requests
+        if ($method === 'POST') {
+            curl_setopt($ch, CURLOPT_POST, true);
+            if (!empty($params)) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($params));
+            }
+        }
+        
+        // Execute request
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        // Handle cURL errors
+        if ($response === false || !empty($error)) {
+            error_log("HTTP request failed: $error");
+            return null;
+        }
+        
+        // Handle non-200 HTTP status codes
+        if ($httpCode < 200 || $httpCode >= 300) {
+            error_log("HTTP request returned status code: $httpCode");
+            error_log("Response: " . substr($response, 0, 500));
+            return null;
+        }
+        
+        // Decode JSON response
+        $decodedResponse = json_decode($response, true);
+        
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            error_log("Failed to decode JSON response: " . json_last_error_msg());
+            error_log("Raw response: " . substr($response, 0, 500));
+            return null;
+        }
+        
+        return $decodedResponse;
+    }
+    
+    /**
+     * Add custom positioned controls to the Azure Map
+     * @param string $mapVariable The map variable name
+     * @return string JavaScript code to add controls
+     */
+    private function AddCustomControls($mapVariable)
+    {
+        $script = "";
+        
+        // Add default Azure Maps controls (they're not included automatically)
+        
+        if ($this->ShowZoomButtons) {
+            $script .= "// Add zoom control\n";
+            $script .= "{$mapVariable}.controls.add(new atlas.control.ZoomControl(), {\n";
+            $script .= "    position: '{$this->ZoomButtonsPosition}'\n";
+            $script .= "});\n";
+        }
+        
+        if ($this->ShowCompass) {
+            $script .= "// Add compass control\n";
+            $script .= "{$mapVariable}.controls.add(new atlas.control.CompassControl(), {\n";
+            $script .= "    position: '{$this->CompassPosition}'\n";
+            $script .= "});\n";
+        }
+        
+        if ($this->ShowPitchToggle) {
+            $script .= "// Add pitch control\n";
+            $script .= "{$mapVariable}.controls.add(new atlas.control.PitchControl(), {\n";
+            $script .= "    position: 'bottom-left'\n";
+            $script .= "});\n";
+        }
+        
+        if ($this->ShowStylePicker) {
+            $script .= "// Add style picker control\n";
+            $script .= "{$mapVariable}.controls.add(new atlas.control.StyleControl({\n";
+            $script .= "    mapStyles: ['road', 'grayscale_light', 'grayscale_dark', 'night', 'satellite', 'satellite_road_labels']\n";
+            $script .= "}), {\n";
+            $script .= "    position: 'top-left'\n";
+            $script .= "});\n";
+        }
+        
+        if ($this->ShowFullscreenControl) {
+            $script .= "// Add fullscreen control\n";
+            $script .= "{$mapVariable}.controls.add(new atlas.control.FullscreenControl(), {\n";
+            $script .= "    position: 'top-right'\n";
+            $script .= "});\n";
+        }
+        
+        if (!empty($script)) {
+            $script = "// Add map controls\n" . $script;
+            $script .= $this->debugLog("Map controls added");
+        }
+        
+        return $script;
     }
 }

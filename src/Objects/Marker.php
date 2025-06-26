@@ -125,7 +125,7 @@ class Marker
         }
         
         $rendered .= "\n});\n";
-        $rendered .= "console.log('Created point feature for marker $this->ID:', point$this->ID);\n";
+        //$rendered .= "console.log('Created point feature for marker $this->ID:', point$this->ID);\n";
         
         if ($this->InfoBox != null) {
             $rendered .= $this->InfoBox->Render($mapVariable, "point$this->ID");
@@ -133,7 +133,7 @@ class Marker
         
         // Add to datasource instead of markers collection
         $rendered .= "dataSource.add(point$this->ID);\n";
-        $rendered .= "console.log('Added point$this->ID to dataSource');\n";
+        //$rendered .= "console.log('Added point$this->ID to dataSource');\n";
         
         return $rendered;
     }
