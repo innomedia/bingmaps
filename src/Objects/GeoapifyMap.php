@@ -353,40 +353,56 @@ class GeoapifyMap extends ViewableData
         if ($this->SpatialDataService == true) {
             $rendered = "";
             
-            // Geoapify Boundaries API implementation
+            // Geoapify Postcode API implementation for postal code boundaries
             $apiKey = SiteConfig::current_site_config()->geoapifyAPIKey;
             
-            $rendered .= "// Function to fetch boundary data using Geoapify Boundaries API\n";
-            $rendered .= "function fetchGeoapifyBoundary(query) {\n";
-            $rendered .= "    var boundaryUrl = 'https://api.geoapify.com/v1/boundaries?text=' + encodeURIComponent(query) + '&apiKey={$apiKey}';\n";
+            $rendered .= "// Function to fetch postcode boundary data using Geoapify Postcode API\n";
+            $rendered .= "function fetchGeoapifyPostcodeBoundary(postcode) {\n";
+            $rendered .= "    var postcodeUrl = 'https://api.geoapify.com/v1/geocode/search?postcode=' + encodeURIComponent(postcode) + '&format=geojson&apiKey={$apiKey}';\n";
             $rendered .= "    \n";
-            $rendered .= "    fetch(boundaryUrl)\n";
+            $rendered .= "    fetch(postcodeUrl)\n";
             $rendered .= "        .then(response => response.json())\n";
             $rendered .= "        .then(data => {\n";
             $rendered .= "            if (data.features && data.features.length > 0) {\n";
-            $rendered .= "                {$mapVariable}.addSource('boundary', {\n";
-            $rendered .= "                    'type': 'geojson',\n";
-            $rendered .= "                    'data': data.features[0]\n";
-            $rendered .= "                });\n";
+            $rendered .= "                // Get the first feature which contains the postcode area\n";
+            $rendered .= "                var feature = data.features[0];\n";
             $rendered .= "                \n";
-            $rendered .= "                {$mapVariable}.addLayer({\n";
-            $rendered .= "                    'id': 'boundary-fill',\n";
-            $rendered .= "                    'type': 'fill',\n";
-            $rendered .= "                    'source': 'boundary',\n";
-            $rendered .= "                    'paint': {\n";
-            $rendered .= "                        'fill-color': 'rgba(13, 66, 104, 0.5)',\n";
-            $rendered .= "                        'fill-outline-color': '#fff'\n";
-            $rendered .= "                    }\n";
-            $rendered .= "                });\n";
+            $rendered .= "                // Add postcode boundary to map if geometry exists\n";
+            $rendered .= "                if (feature.geometry) {\n";
+            $rendered .= "                    {$mapVariable}.addSource('postcode-boundary', {\n";
+            $rendered .= "                        'type': 'geojson',\n";
+            $rendered .= "                        'data': feature\n";
+            $rendered .= "                    });\n";
+            $rendered .= "                    \n";
+            $rendered .= "                    {$mapVariable}.addLayer({\n";
+            $rendered .= "                        'id': 'postcode-boundary-fill',\n";
+            $rendered .= "                        'type': 'fill',\n";
+            $rendered .= "                        'source': 'postcode-boundary',\n";
+            $rendered .= "                        'paint': {\n";
+            $rendered .= "                            'fill-color': 'rgba(13, 66, 104, 0.3)',\n";
+            $rendered .= "                            'fill-outline-color': '#0d4268'\n";
+            $rendered .= "                        }\n";
+            $rendered .= "                    });\n";
+            $rendered .= "                    \n";
+            $rendered .= "                    {$mapVariable}.addLayer({\n";
+            $rendered .= "                        'id': 'postcode-boundary-outline',\n";
+            $rendered .= "                        'type': 'line',\n";
+            $rendered .= "                        'source': 'postcode-boundary',\n";
+            $rendered .= "                        'paint': {\n";
+            $rendered .= "                            'line-color': '#0d4268',\n";
+            $rendered .= "                            'line-width': 2\n";
+            $rendered .= "                        }\n";
+            $rendered .= "                    });\n";
+            $rendered .= "                }\n";
             $rendered .= "            }\n";
             $rendered .= "        })\n";
-            $rendered .= "        .catch(error => console.error('Error fetching boundary data:', error));\n";
+            $rendered .= "        .catch(error => console.error('Error fetching postcode boundary data:', error));\n";
             $rendered .= "}\n";
             
-            // Execute boundary requests
+            // Execute postcode boundary requests
             if ($this->SpatialDataServicePostalCodes !== null) {
-                $rendered .= "// Fetch boundary for postal code\n";
-                $rendered .= "fetchGeoapifyBoundary('{$this->SpatialDataServicePostalCodes}');\n";
+                $rendered .= "// Fetch boundary for postcode\n";
+                $rendered .= "fetchGeoapifyPostcodeBoundary('{$this->SpatialDataServicePostalCodes}');\n";
             }
             
             return $rendered;

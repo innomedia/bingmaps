@@ -23,46 +23,23 @@ class Coordinates
     {
         $siteConfig = SiteConfig::current_site_config();
         $geoapifyAPIKey = $siteConfig->geoapifyAPIKey;
-        $azureAPIKey = $siteConfig->bingAPIKey;
         
-        // Try Geoapify first, fallback to Azure Maps
-        if (!empty($geoapifyAPIKey)) {
-            return self::getGeoapifyCoordinatesFromAddress($Address, $geoapifyAPIKey);
-        } elseif (!empty($azureAPIKey)) {
-            return self::getAzureCoordinatesFromAddress($Address, $azureAPIKey);
-        } else {
-            throw new \Exception("No API Key Found - either Geoapify or Azure Maps API key required");
+        if (empty($geoapifyAPIKey)) {
+            throw new \Exception("Geoapify API key not found. Please configure the Geoapify API key.");
         }
+        
+        return self::getGeoapifyCoordinatesFromAddress($Address, $geoapifyAPIKey);
     }
     public static function GetCoordinatesFromQuery(string $query)
     {
         $siteConfig = SiteConfig::current_site_config();
         $geoapifyAPIKey = $siteConfig->geoapifyAPIKey;
-        $azureAPIKey = $siteConfig->bingAPIKey;
         
-        // Try Geoapify first, fallback to Azure Maps
-        if (!empty($geoapifyAPIKey)) {
-            return self::getGeoapifyCoordinatesFromQuery($query, $geoapifyAPIKey);
-        } elseif (!empty($azureAPIKey)) {
-            return self::getAzureCoordinatesFromQuery($query, $azureAPIKey);
-        } else {
-            throw new \Exception("No API Key Found - either Geoapify or Azure Maps API key required");
-        }
-    }
-    private static function getCoordsFromRequest($requestURL)
-    {
-        $output = file_get_contents($requestURL);
-        $response = json_decode($output, true);
-
-        // Extract data (e.g. latitude and longitude) from the results
-        if (isset($response['results']) && count($response['results']) > 0) {
-            $latitude = $response['results'][0]['position']['lat'];
-            $longitude = $response['results'][0]['position']['lon'];
-        } else {
-            throw new \Exception("No coordinates found for the given address");
+        if (empty($geoapifyAPIKey)) {
+            throw new \Exception("Geoapify API key not found. Please configure the Geoapify API key.");
         }
         
-        return new Coordinates($latitude, $longitude);
+        return self::getGeoapifyCoordinatesFromQuery($query, $geoapifyAPIKey);
     }
     public function GetLatitude()
     {
@@ -114,21 +91,6 @@ class Coordinates
         }
         
         return new Coordinates($latitude, $longitude);
-    }
-
-    // Azure Maps fallback methods (renamed from existing)
-    private static function getAzureCoordinatesFromAddress(string $address, string $apiKey)
-    {
-        $addressLine = urlencode($address);
-        $request = "https://atlas.microsoft.com/search/address/json?subscription-key=$apiKey&api-version=1.0&query=$addressLine";
-        return self::getCoordsFromRequest($request);
-    }
-
-    private static function getAzureCoordinatesFromQuery(string $query, string $apiKey)
-    {
-        $queryLine = urlencode($query);
-        $request = "https://atlas.microsoft.com/search/fuzzy/json?subscription-key=$apiKey&api-version=1.0&query=$queryLine";
-        return self::getCoordsFromRequest($request);
     }
 
 }

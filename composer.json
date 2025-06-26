@@ -1,6 +1,6 @@
 {
     "name":"innomedia/bingmaps",
-    "description": "Silverstripe 4 Maps Implementation - Azure Maps and Geoapify",
+    "description": "Silverstripe 4 Maps Implementation - Geoapify Integration",
     "license": "BSD-3-Clause",
     "authors": [
       {
