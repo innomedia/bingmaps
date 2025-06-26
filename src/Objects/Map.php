@@ -6,6 +6,32 @@ use SilverStripe\Dev\Debug;
 use SilverStripe\View\ViewableData;
 use SilverStripe\SiteConfig\SiteConfig;
 
+/**
+ * Azure Maps integration class for SilverStripe
+ * 
+ * This class provides a comprehensive interface for creating and configuring Azure Maps
+ * with support for markers, clustering, spatial data, and various interaction options.
+ * 
+ * Available interaction control methods:
+ * - DisableMouseWheelZoom(): Disables scroll wheel zooming
+ * - DisablePanning(): Disables map dragging/panning 
+ * - DisableZooming(): Disables all zoom interactions
+ * - DisableRotation(): Disables map rotation
+ * - DisablePitching(): Disables 3D pitch/tilt
+ * 
+ * Available UI control methods:
+ * - HideZoomButtons(): Hides zoom control buttons
+ * - HideCompass(): Hides compass control
+ * - HidePitchToggle(): Hides pitch toggle control  
+ * - HideStylePicker(): Hides style picker control
+ * 
+ * Usage example:
+ * $map = Map::createMap("myMap", "", true);
+ * $map->SetZoom(10)
+ *     ->DisableMouseWheelZoom()
+ *     ->HideZoomButtons();
+ * echo $map->XML_val("");
+ */
 class Map extends ViewableData
 {
     use MapPosition;
@@ -30,6 +56,16 @@ class Map extends ViewableData
     private $SpatialDataServiceType = "PopulatedPlace";
     private $SpatialDataServicePostalCodes = null;
     private $PolygoneData = [];
+    
+    // Additional Azure Maps specific options
+    private $DisablePanning = false;
+    private $DisableZooming = false;
+    private $DisableRotation = false;
+    private $DisablePitching = false;
+    private $ShowZoomButtons = true;
+    private $ShowCompass = true;
+    private $ShowPitchToggle = true;
+    private $ShowStylePicker = true;
     /*
       • AdminDivision1: First administrative level within the country/region level, such as a state or a province.
   • AdminDivision2: Second administrative level within the country/region level, such as a county.
@@ -116,6 +152,78 @@ class Map extends ViewableData
     public function DisableMouseWheelZoom()
     {
         $this->MouseWheelZoom = true;
+    }
+    
+    /**
+     * Disable panning (dragging) on the map
+     */
+    public function DisablePanning()
+    {
+        $this->DisablePanning = true;
+        return $this;
+    }
+    
+    /**
+     * Disable zooming functionality (both scroll wheel and zoom buttons)
+     */
+    public function DisableZooming()
+    {
+        $this->DisableZooming = true;
+        return $this;
+    }
+    
+    /**
+     * Disable map rotation
+     */
+    public function DisableRotation()
+    {
+        $this->DisableRotation = true;
+        return $this;
+    }
+    
+    /**
+     * Disable map pitching (3D tilt)
+     */
+    public function DisablePitching()
+    {
+        $this->DisablePitching = true;
+        return $this;
+    }
+    
+    /**
+     * Hide zoom control buttons
+     */
+    public function HideZoomButtons()
+    {
+        $this->ShowZoomButtons = false;
+        return $this;
+    }
+    
+    /**
+     * Hide compass control
+     */
+    public function HideCompass()
+    {
+        $this->ShowCompass = false;
+        return $this;
+    }
+    
+    /**
+     * Hide pitch toggle control
+     */
+    public function HidePitchToggle()
+    {
+        $this->ShowPitchToggle = false;
+        return $this;
+    }
+    
+    /**
+     * Hide style picker control
+     */
+    public function HideStylePicker()
+    {
+        $this->ShowStylePicker = false;
+        return $this;
     }
     public function SetIcon($IconPath)
     {
@@ -649,6 +757,9 @@ class Map extends ViewableData
         }
         return "";
     }
+
+    
+
     private function RenderSpatialDataService($mapVariable)
     {
         if ($this->SpatialDataService == true) {
@@ -745,23 +856,86 @@ class Map extends ViewableData
     public function RenderOptions($mapVariable)
     {
         $script = "";
-
-        $optionsarray = [];
-        //Remember to
+        
+        // Azure Maps doesn't have setOptions() like Bing Maps
+        // Instead, we need to use specific methods after map creation
+        
+        // Handle user interaction options
+        $userInteractionOptions = [];
+        
         if ($this->MouseWheelZoom != null) {
-            $optionsarray["disableScrollWheelZoom"] = "true";
+            $userInteractionOptions['scrollZoomInteraction'] = false;
         }
-        $options = "";
-        foreach ($optionsarray as $key => $value) {
-            $options .= $key . ": " . $value . ",";
+        
+        if ($this->DisablePanning) {
+            $userInteractionOptions['dragPanInteraction'] = false;
         }
-
-        if ($options != "") {
-            $options = substr($options, 0, -1);
-            $script .= $mapVariable . ".setOptions({{$options}});\n";
+        
+        if ($this->DisableZooming) {
+            $userInteractionOptions['scrollZoomInteraction'] = false;
+            $userInteractionOptions['dblClickZoomInteraction'] = false;
         }
+        
+        if ($this->DisableRotation) {
+            $userInteractionOptions['dragRotateInteraction'] = false;
+            $userInteractionOptions['keyboardInteraction'] = false;
+        }
+        
+        if ($this->DisablePitching) {
+            $userInteractionOptions['touchInteraction'] = false;
+        }
+        
+        // Apply user interaction options if any are set
+        if (!empty($userInteractionOptions)) {
+            $script .= "{$mapVariable}.setUserInteraction({\n";
+            $optionPairs = [];
+            foreach ($userInteractionOptions as $key => $value) {
+                $optionPairs[] = "    {$key}: " . ($value ? 'true' : 'false');
+            }
+            $script .= implode(",\n", $optionPairs) . "\n";
+            $script .= "});\n";
+            $script .= $this->debugLog("User interaction options applied");
+        }
+        
+        // Handle control visibility
+        if (!$this->ShowZoomButtons) {
+            $script .= "{$mapVariable}.controls.remove('zoom');\n";
+        }
+        
+        if (!$this->ShowCompass) {
+            $script .= "{$mapVariable}.controls.remove('compass');\n";
+        }
+        
+        if (!$this->ShowPitchToggle) {
+            $script .= "{$mapVariable}.controls.remove('pitch');\n";
+        }
+        
+        if (!$this->ShowStylePicker) {
+            $script .= "{$mapVariable}.controls.remove('style');\n";
+        }
+        
+        if (!$this->ShowZoomButtons || !$this->ShowCompass || !$this->ShowPitchToggle || !$this->ShowStylePicker) {
+            $script .= $this->debugLog("Map controls configured");
+        }
+        
         return $script;
-    }    public function RenderFunction()
+    }
+    
+    /**
+     * Get map constructor options for Azure Maps
+     * These options need to be set during map creation, not after
+     * @return string JSON-formatted options for map constructor
+     */
+    public function GetMapConstructorOptions()
+    {
+        $options = [];
+        
+        // Add any options that need to be set during map creation
+        // Most interaction and control options are better set after creation
+        
+        return !empty($options) ? ',' . json_encode($options, JSON_UNESCAPED_SLASHES) : '';
+    }   
+    public function RenderFunction()
     {
         $rendered = "";
         $Attributes = "";
@@ -926,6 +1100,197 @@ class Map extends ViewableData
     public function getIconPath()
     {
         return $this->IconPath;
+    }
+    
+    /**
+     * Get polygon outline for a coordinate using Azure Maps Search - Get Polygon API
+     * @param float $latitude The latitude coordinate
+     * @param float $longitude The longitude coordinate
+     * @param array $options Optional parameters for the search
+     * @return array|null Returns polygon data or null if not found
+     */
+    public function getPolygonForCoordinate($latitude, $longitude, $options = [])
+    {
+        $apiKey = SiteConfig::current_site_config()->bingAPIKey ?? '';
+        
+        if (!$apiKey) {
+            error_log("Azure Maps API key not found for getPolygonForCoordinate");
+            return null;
+        }
+        
+        // Default options
+        $defaultOptions = [
+            'entityType' => 'Municipality,CountrySubdivision,CountrySecondarySubdivision', // City, State, County
+            'returnGeometry' => true,
+            'geometryFormat' => 'geojson'
+        ];
+        $options = array_merge($defaultOptions, $options);
+        
+        // Step 1: First get the address/place information for the coordinate
+        $reverseGeoUrl = "https://atlas.microsoft.com/search/address/reverse/json";
+        $reverseParams = [
+            'api-version' => '1.0',
+            'subscription-key' => $apiKey,
+            'query' => $latitude . ',' . $longitude,
+            'returnSpeedLimit' => false,
+            'returnRoadUse' => false,
+            'allowFreeformNewline' => false
+        ];
+        
+        error_log("Getting address for coordinate: $latitude, $longitude");
+        $reverseResponse = $this->makeHttpRequest($reverseGeoUrl, $reverseParams);
+        
+        if (!$reverseResponse || !isset($reverseResponse['addresses']) || empty($reverseResponse['addresses'])) {
+            error_log("Failed to get address for coordinate: $latitude, $longitude");
+            return null;
+        }
+        
+        $address = $reverseResponse['addresses'][0];
+        error_log("Found address: " . json_encode($address['address']));
+        
+        // Step 2: Try to get polygon using different administrative levels
+        $polygonData = null;
+        
+        // Try municipality (city/village) first
+        if (isset($address['address']['municipality'])) {
+            $polygonData = $this->fetchPolygonByEntity($latitude, $longitude, 'Municipality', $apiKey);
+            if ($polygonData) {
+                $polygonData['level'] = 'municipality';
+                $polygonData['name'] = $address['address']['municipality'];
+            }
+        }
+        
+        // If no municipality polygon, try county/subdivision
+        if (!$polygonData && isset($address['address']['countrySubdivision'])) {
+            $polygonData = $this->fetchPolygonByEntity($latitude, $longitude, 'CountrySubdivision', $apiKey);
+            if ($polygonData) {
+                $polygonData['level'] = 'state';
+                $polygonData['name'] = $address['address']['countrySubdivision'];
+            }
+        }
+        
+        // If no subdivision polygon, try secondary subdivision (county)
+        if (!$polygonData && isset($address['address']['countrySecondarySubdivision'])) {
+            $polygonData = $this->fetchPolygonByEntity($latitude, $longitude, 'CountrySecondarySubdivision', $apiKey);
+            if ($polygonData) {
+                $polygonData['level'] = 'county';
+                $polygonData['name'] = $address['address']['countrySecondarySubdivision'];
+            }
+        }
+        
+        // If still no polygon, try country level
+        if (!$polygonData && isset($address['address']['country'])) {
+            $polygonData = $this->fetchPolygonByEntity($latitude, $longitude, 'Country', $apiKey);
+            if ($polygonData) {
+                $polygonData['level'] = 'country';
+                $polygonData['name'] = $address['address']['country'];
+            }
+        }
+        
+        if ($polygonData) {
+            // Add additional address information
+            $polygonData['address'] = $address['address'];
+            $polygonData['coordinate'] = ['lat' => $latitude, 'lon' => $longitude];
+            error_log("Successfully found polygon for coordinate at " . $polygonData['level'] . " level: " . $polygonData['name']);
+        } else {
+            error_log("No polygon found for coordinate: $latitude, $longitude");
+        }
+        
+        return $polygonData;
+    }
+    
+    /**
+     * Fetch polygon by entity type for a specific coordinate
+     * @param float $latitude The latitude coordinate
+     * @param float $longitude The longitude coordinate  
+     * @param string $entityType The type of entity (Municipality, CountrySubdivision, etc.)
+     * @param string $apiKey Azure Maps API key
+     * @return array|null Returns polygon data or null if not found
+     */
+    private function fetchPolygonByEntity($latitude, $longitude, $entityType, $apiKey)
+    {
+        $polygonUrl = "https://atlas.microsoft.com/search/polygon/json";
+        $polygonParams = [
+            'api-version' => '1.0',
+            'subscription-key' => $apiKey,
+            'coordinates' => $longitude . ',' . $latitude, // Note: longitude first for Azure Maps
+            'entityType' => $entityType,
+            'returnGeometry' => true
+        ];
+        
+        error_log("Fetching $entityType polygon for coordinate: $latitude, $longitude");
+        $response = $this->makeHttpRequest($polygonUrl, $polygonParams);
+        
+        if (!$response || !isset($response['geometries']) || empty($response['geometries'])) {
+            error_log("No $entityType polygon found for coordinate");
+            return null;
+        }
+        
+        $geometry = $response['geometries'][0];
+        
+        // Extract polygon coordinates
+        if (isset($geometry['geometryData']) && isset($geometry['geometryData']['geometry'])) {
+            $geoData = $geometry['geometryData']['geometry'];
+            
+            if ($geoData['type'] === 'Polygon' && isset($geoData['coordinates'])) {
+                $coordinates = $geoData['coordinates'][0]; // Get outer ring
+                
+                // Convert to lat/lng format (Azure Maps returns lng/lat)
+                $polygonPoints = [];
+                foreach ($coordinates as $coord) {
+                    $polygonPoints[] = [
+                        'lat' => $coord[1], 
+                        'lng' => $coord[0]
+                    ];
+                }
+                
+                error_log("Found $entityType polygon with " . count($polygonPoints) . " points");
+                
+                return [
+                    'type' => 'polygon',
+                    'entityType' => $entityType,
+                    'coordinates' => $polygonPoints,
+                    'rawGeometry' => $geoData,
+                    'properties' => isset($geometry['properties']) ? $geometry['properties'] : []
+                ];
+            }
+            elseif ($geoData['type'] === 'MultiPolygon' && isset($geoData['coordinates'])) {
+                // Handle MultiPolygon - take the largest polygon
+                $largestPolygon = null;
+                $maxPoints = 0;
+                
+                foreach ($geoData['coordinates'] as $polygon) {
+                    $coordinates = $polygon[0]; // Get outer ring
+                    if (count($coordinates) > $maxPoints) {
+                        $maxPoints = count($coordinates);
+                        $largestPolygon = $coordinates;
+                    }
+                }
+                
+                if ($largestPolygon) {
+                    $polygonPoints = [];
+                    foreach ($largestPolygon as $coord) {
+                        $polygonPoints[] = [
+                            'lat' => $coord[1], 
+                            'lng' => $coord[0]
+                        ];
+                    }
+                    
+                    error_log("Found $entityType MultiPolygon, using largest with " . count($polygonPoints) . " points");
+                    
+                    return [
+                        'type' => 'multipolygon',
+                        'entityType' => $entityType,
+                        'coordinates' => $polygonPoints,
+                        'rawGeometry' => $geoData,
+                        'properties' => isset($geometry['properties']) ? $geometry['properties'] : []
+                    ];
+                }
+            }
+        }
+        
+        error_log("$entityType polygon found but could not extract coordinates");
+        return null;
     }
     
     /**
