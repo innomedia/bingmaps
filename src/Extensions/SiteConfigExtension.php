@@ -9,11 +9,13 @@ use SilverStripe\ORM\DataExtension;
 class SiteConfigExtension extends DataExtension
 {
     private static $db = [
-        "bingAPIKey"    =>  'Text'
+        "bingAPIKey"    =>  'Text',
+        "geoapifyAPIKey" => 'Text'
     ];
 
     public function updateCMSFields(FieldList $fields)
     {
         $fields->addFieldToTab('Root.Azure Maps',TextField::create('bingAPIKey','Azure Maps Subscription Key'));
+        $fields->addFieldToTab('Root.Geoapify Maps',TextField::create('geoapifyAPIKey','Geoapify API Key'));
     }
 }

@@ -177,4 +177,68 @@ class Marker
         }
         return $data;
     }
+
+    public function RenderGeoapify($mapVariable, $ClusterEnabled)
+    {
+        if ($this->InfoBox != null && !$this->InfoBox->HasPosition()) {
+            $this->InfoBox->SetPosition($this->GetPosition());
+        }
+        
+        $rendered = "";
+        $rendered .= $this->RenderLocationVariable($this->ID, self::$Suffix) . "\n";
+        
+        if (!$ClusterEnabled) {
+            // Create MapLibre GL marker
+            $rendered .= "var marker{$this->ID} = new maplibregl.Marker({\n";
+            
+            // Add custom icon if available
+            if ($this->IconPath != null || $this->Base64Icon != null || $this->IconVariable != null) {
+                $rendered .= "    element: (function() {\n";
+                $rendered .= "        var el = document.createElement('div');\n";
+                $rendered .= "        el.className = 'custom-marker';\n";
+                $rendered .= "        el.style.backgroundImage = 'url(";
+                
+                if ($this->IconPath != null) {
+                    $rendered .= $this->IconPath;
+                } elseif ($this->Base64Icon != null) {
+                    $rendered .= $this->Base64Icon;
+                } elseif ($this->IconVariable != null) {
+                    $rendered .= "' + {$this->IconVariable} + '";
+                }
+                
+                $rendered .= ")';\n";
+                $rendered .= "        el.style.width = '32px';\n";
+                $rendered .= "        el.style.height = '32px';\n";
+                $rendered .= "        el.style.backgroundSize = 'cover';\n";
+                $rendered .= "        el.style.borderRadius = '50%';\n";
+                $rendered .= "        el.style.cursor = 'pointer';\n";
+                $rendered .= "        return el;\n";
+                $rendered .= "    })()\n";
+            }
+            
+            $rendered .= "})\n";
+            $rendered .= ".setLngLat({$this->GetLocationVariable($this->ID, self::$Suffix)})\n";
+            $rendered .= ".addTo({$mapVariable});\n";
+            
+            // Add popup if InfoBox exists
+            if ($this->InfoBox != null) {
+                $content = $this->InfoBox->GetContent();
+                $rendered .= "var popup{$this->ID} = new maplibregl.Popup({ offset: 25 })\n";
+                $rendered .= ".setHTML(" . json_encode($content) . ");\n";
+                $rendered .= "marker{$this->ID}.setPopup(popup{$this->ID});\n";
+                
+                // Add click event to show popup
+                $rendered .= "marker{$this->ID}.getElement().addEventListener('click', function() {\n";
+                $rendered .= "    popup{$this->ID}.addTo({$mapVariable});\n";
+                $rendered .= "});\n";
+            }
+        }
+        
+        return $rendered;
+    }
+
+    public function GetID()
+    {
+        return $this->ID;
+    }
 }
