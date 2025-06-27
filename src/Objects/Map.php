@@ -403,7 +403,7 @@ class Map extends ViewableData
                 $rendered .= "                ],\n";
                 $rendered .= "                anchor: '{$this->MarkerAnchor}',\n";
                 $rendered .= "                allowOverlap: true,\n";
-                $rendered .= "                size: 1.2\n";
+                $rendered .= "                size: 1.0\n";
                 $rendered .= "            },\n";
                 $rendered .= "            textOptions: {\n";
                 $rendered .= "                textField: ['get', 'title'],\n";
@@ -419,11 +419,7 @@ class Map extends ViewableData
                 $rendered .= "                var shape = e.shapes[0];\n";
                 $rendered .= "                var properties = shape.getProperties();\n";
                 $rendered .= "                if (properties.popupContent) {\n";
-                $rendered .= "                    var popup = new atlas.Popup({\n";
-                $rendered .= "                        content: properties.popupContent,\n";
-                $rendered .= "                        position: shape.getCoordinates()\n";
-                $rendered .= "                    });\n";
-                $rendered .= "                    popup.open({$mapVariable});\n";
+                $rendered .= "                    showPopup(properties.popupContent, shape.getCoordinates());\n";
                 $rendered .= "                }\n";
                 $rendered .= "            }\n";
                 $rendered .= "        });\n";
@@ -452,7 +448,7 @@ class Map extends ViewableData
                 $rendered .= "        image: 'pin-red',\n";
                 $rendered .= "        anchor: '{$this->MarkerAnchor}',\n";
                 $rendered .= "        allowOverlap: true,\n";
-                $rendered .= "        size: 1.2\n";
+                $rendered .= "        size: 1.0\n";
                 $rendered .= "    },\n";
                 $rendered .= "    textOptions: {\n";
                 $rendered .= "        textField: ['get', 'title'],\n";
@@ -468,11 +464,7 @@ class Map extends ViewableData
                 $rendered .= "        var shape = e.shapes[0];\n";
                 $rendered .= "        var properties = shape.getProperties();\n";
                 $rendered .= "        if (properties.popupContent) {\n";
-                $rendered .= "            var popup = new atlas.Popup({\n";
-                $rendered .= "                content: properties.popupContent,\n";
-                $rendered .= "                position: shape.getCoordinates()\n";
-                $rendered .= "            });\n";
-                $rendered .= "            popup.open({$mapVariable});\n";
+                $rendered .= "            showPopup(properties.popupContent, shape.getCoordinates());\n";
                 $rendered .= "        }\n";
                 $rendered .= "    }\n";
                 $rendered .= "});\n";
@@ -678,11 +670,7 @@ class Map extends ViewableData
             $rendered .= "            });\n";
             $rendered .= "        } else if (properties.popupContent) {\n";
             $rendered .= "            // This is an individual point with popup content\n";
-            $rendered .= "            var popup = new atlas.Popup({\n";
-            $rendered .= "                content: properties.popupContent,\n";
-            $rendered .= "                position: e.shapes[0].getCoordinates()\n";
-            $rendered .= "            });\n";
-            $rendered .= "            popup.open({$mapVariable});\n";
+            $rendered .= "            showPopup(properties.popupContent, e.shapes[0].getCoordinates());\n";
             $rendered .= "        }\n";
             $rendered .= "    }\n";
             $rendered .= "});\n";
@@ -778,18 +766,8 @@ class Map extends ViewableData
                 
                 {$mapVariable}.layers.add(polygonLayer);
                 
-                // Add click event for polygon interactions
-                {$mapVariable}.events.add('click', polygonLayer, function(e) {
-                    if (e.shapes && e.shapes.length > 0) {
-                        var properties = e.shapes[0].getProperties();
-                        
-                        var popup = new atlas.Popup({
-                            content: '<div style=\"padding: 10px;\"><strong>Custom Polygon</strong><br/>ID: ' + (properties.polygonId !== undefined ? properties.polygonId : 'Unknown') + '</div>',
-                            position: e.position
-                        });
-                        popup.open({$mapVariable});
-                    }
-                });
+                // Polygon click events disabled - no tooltips needed for custom polygons
+                // If you need polygon interactions in the future, you can add click events here
             } else {" . $this->debugLog("No valid polygon features to add", "console.warn") . "
             }
             ";
@@ -1081,6 +1059,26 @@ class Map extends ViewableData
         $rendered .= "{$mapVariable}.events.add('ready', function() {\n";
         $rendered .= "clearTimeout(mapReadyTimeout);\n";
         $rendered .= $this->debugLog("Map is ready! Adding content...");
+        
+        // Create a global popup variable to ensure only one popup is open at a time
+        $rendered .= "var globalPopup = null;\n";
+        $rendered .= $this->debugLog("Global popup variable initialized");
+        
+        // Helper function to show popup (closes existing popup first)
+        $rendered .= "function showPopup(content, position) {\n";
+        $rendered .= "    // Close existing popup if open\n";
+        $rendered .= "    if (globalPopup) {\n";
+        $rendered .= "        globalPopup.close();\n";
+        $rendered .= "        globalPopup = null;\n";
+        $rendered .= "    }\n";
+        $rendered .= "    // Create and open new popup\n";
+        $rendered .= "    globalPopup = new atlas.Popup({\n";
+        $rendered .= "        content: content,\n";
+        $rendered .= "        position: position\n";
+        $rendered .= "    });\n";
+        $rendered .= "    globalPopup.open({$mapVariable});\n";
+        $rendered .= "}\n";
+        $rendered .= $this->debugLog("Popup helper function defined");
         
         $rendered .= $this->RenderOptions($mapVariable);
         $rendered .= $this->RenderIcon();

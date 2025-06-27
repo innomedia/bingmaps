@@ -106,7 +106,11 @@ class InfoBox
         if($this->HTMLContent != null)
         {
             return "function closePopup$this->ID(){
-                popup$this->ID.close();
+                // Use global popup management - close the global popup
+                if (globalPopup) {
+                    globalPopup.close();
+                    globalPopup = null;
+                }
             }";
         }
         return "";
@@ -142,26 +146,21 @@ class InfoBox
             // Use json_encode to properly escape the content for JavaScript
             $contentJson = json_encode($content);
             
+            // Store popup content for use with global popup management system
+            // Instead of creating individual popups, we'll use the global showPopup function
+            
             // Check if this is a Point feature (starts with "point") or an HtmlMarker
             if (strpos($markerVariable, 'point') === 0) {
-                // For Point features, we don't attach events here - they'll be handled by the layer
-                $rendered .= "var popup$this->ID = new atlas.Popup({
-                    position: {$this->GetLocationVariable($this->ID,self::$Suffix)},
-                    content: $contentJson
-                });
-                InfoBoxCollection.push(popup$this->ID);
-                // Note: Click events for Point features are handled by the layer, not individual features
+                // For Point features, store the popup content in the feature properties
+                // The layer click handler will use the global showPopup function
+                $rendered .= "// InfoBox content for Point feature will be handled by layer click event
+                // Content stored in feature properties as 'popupContent'
                 ";
             } else {
-                // Original behavior for HtmlMarkers
-                $rendered .= "var popup$this->ID = new atlas.Popup({
-                    position: {$this->GetLocationVariable($this->ID,self::$Suffix)},
-                    content: $contentJson
-                });
-                InfoBoxCollection.push(popup$this->ID);
-                {$mapVariable}.popups.add(popup$this->ID);
+                // For HtmlMarkers, use the global popup management system
+                $rendered .= "// Use global popup management for HtmlMarkers
                 {$mapVariable}.events.add('click', $markerVariable, function() {
-                    popup{$this->ID}.open({$mapVariable});
+                    showPopup($contentJson, {$this->GetLocationVariable($this->ID,self::$Suffix)});
                 });
                 ";
             }
