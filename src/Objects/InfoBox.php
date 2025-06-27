@@ -174,7 +174,7 @@ class InfoBox
     {
         $content = "<div style='padding:10px'>";
         if ($this->Title) {
-            $content .= "<h3>" . htmlspecialchars($this->Title) . "</h3>";
+            $content .= '<span class="h4 d-block">' . htmlspecialchars($this->Title) . "</span>";
         }
         if ($this->Description) {
             $content .= "<p>" . htmlspecialchars($this->Description) . "</p>";
