@@ -129,7 +129,7 @@ class InfoBox
             // Build content - use double quotes to avoid conflicts with single quotes in HTML
             $content = '<div style="padding:10px">';
             if ($this->Title) {
-                $content .= '<h3>' . htmlspecialchars($this->Title, ENT_QUOTES) . '</h3>';
+                $content .= '<span class="h4 d-block">' . htmlspecialchars($this->Title, ENT_QUOTES) . '</span>';
             }
             if ($this->Description) {
                 $content .= '<p>' . htmlspecialchars($this->Description, ENT_QUOTES) . '</p>';
