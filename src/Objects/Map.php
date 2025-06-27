@@ -454,7 +454,7 @@ class Map extends ViewableData
                 $rendered .= "        textField: ['get', 'title'],\n";
                 $rendered .= "        offset: [0, -2]\n";
                 $rendered .= "    }\n";
-                $rendered .= "});\n";
+                $rendered .= "};\n";
                 $rendered .= "{$mapVariable}.layers.add(symbolLayer);\n";
                 $rendered .= $this->debugLog("SymbolLayer added to map");
                 
@@ -782,74 +782,107 @@ class Map extends ViewableData
       private function RenderSpatialDataService($mapVariable)
     {
         if ($this->SpatialDataService == true) {
-            /*
-            // Debug: Test getPolygonForCoordinate for the first marker
-            if (!empty($this->Markers)) {
-                $firstMarker = $this->Markers[0];
-                if ($firstMarker->HasPosition()) {
-                    $latitude = $firstMarker->GetLatitude();
-                    $longitude = $firstMarker->GetLongitude();
-                    error_log("Debug: About to call getPolygonForCoordinate with lat: $latitude, lng: $longitude");
-                    $polygonResult = $this->getPolygonForCoordinate($latitude, $longitude);
-                    Debug::dump([
-                        'latitude' => $latitude,
-                        'longitude' => $longitude,
-                        'polygonResult' => $polygonResult
-                    ]);
-                } else {
-                    //Debug::dump('First marker has no position');
-                }
-            } else {
-                Debug::dump('No markers found');
-            }*/
             
-            $rendered = "";
-
-            $rendered .= "var geoDataRequestOptions = {
-                entityType: '".$this->SpatialDataServiceType."',
-                getAllPolygons: true
-            };\n";
-
-            if($this->SpatialDataServicePostalCodes !== null) {
-                $rendered .= "var polygonStyle = {
-                    fillColor: 'rgba(13, 66, 104, 1)',
-                    strokeColor: '#fff',
-                    strokeThickness: 1
-                };\n";
-            }
-
-            $rendered .= "Microsoft.Maps.loadModule('Microsoft.Maps.SpatialDataService',function () {";
-                $rendered .= "var Locations = [];";
-                if($this->SpatialDataServicePostalCodes !== null){
-                    $rendered .= "Microsoft.Maps.SpatialDataService.GeoDataAPIManager.getBoundary(
-                        ".$this->SpatialDataServicePostalCodes.",
-                        geoDataRequestOptions,
-                        {$mapVariable},
-                        function (data) {
-                            //Add the polygons to the map.
-                            if (data.results && data.results.length > 0) {
-                                {$mapVariable}.entities.push(data.results[0].Polygons);
+            // Fetch polygon data for markers and add to PolygoneData for rendering
+            if (!empty($this->Markers)) {
+                error_log("Fetching spatial polygons for " . count($this->Markers) . " markers (caching enabled)");
+                
+                // Initialize PolygoneData if not set
+                if (!$this->PolygoneData) {
+                    $this->PolygoneData = [];
+                }
+                
+                $cacheHits = 0;
+                $cacheMisses = 0;
+                
+                for ($i = 0; $i < count($this->Markers); $i++) {
+                    $marker = $this->Markers[$i];
+                    if ($marker->HasPosition()) {
+                        $latitude = $marker->GetLatitude();
+                        $longitude = $marker->GetLongitude();
+                        
+                        error_log("Processing polygon for marker $i at coordinates: $latitude, $longitude");
+                        
+                        // Try to get polygon data from cache first
+                        $polygonResult = null;
+                        $cachedData = $this->getPolygonFromCache($latitude, $longitude);
+                        if ($cachedData && isset($cachedData['data'])) {
+                            $polygonResult = $cachedData['data'];
+                            $cacheHits++;
+                            error_log("Using cached polygon data for marker $i");
+                        } else {
+                            $cacheMisses++;
+                        }
+                        
+                        // If no cache hit, fetch from API
+                        if (!$polygonResult) {
+                            error_log("Fetching polygon from API for marker $i at coordinates: $latitude, $longitude");
+                            $polygonResult = $this->getPolygonForCoordinate($latitude, $longitude);
+                            // Cache the result if successful
+                            if ($polygonResult) {
+                                $this->savePolygonToCache($latitude, $longitude, $polygonResult);
                             }
-                        }, polygonStyle);";
-                } else {
-                    for ($i = 0; $i < count($this->Markers); $i++) {
-                        $rendered .= "Microsoft.Maps.SpatialDataService.GeoDataAPIManager.getBoundary(
-                            ".$this->Markers[$i]->RenderLocation().",
-                            geoDataRequestOptions,
-                            {$mapVariable},
-                            function (data) {
-                                //Add the polygons to the map.
-                                if (data.results && data.results.length > 0) {
-                                    {$mapVariable}.entities.push(data.results[0].Polygons);
-                                }
-                            });";
+                        }
+                        
+                        if ($polygonResult && isset($polygonResult['coordinates'])) {
+                            // Convert polygon data to PolygoneData format
+                            $polygonForMap = [
+                                'Coords' => [],
+                                'Colors' => [
+                                    'Background' => $this->getPolygonColorByLevel($polygonResult['level'] ?? 'municipality'),
+                                    'Stroke' => $this->getPolygonStrokeColorByLevel($polygonResult['level'] ?? 'municipality')
+                                ],
+                                'Source' => 'spatial-data-service',
+                                'EntityType' => $polygonResult['entityType'] ?? 'Unknown',
+                                'Level' => $polygonResult['level'] ?? 'municipality',
+                                'Name' => $polygonResult['name'] ?? 'Unknown Area',
+                                'GeometryId' => $polygonResult['geometryId'] ?? ''
+                            ];
+                            
+                            // Convert coordinates to coordinate objects
+                            foreach ($polygonResult['coordinates'] as $coord) {
+                                // Create a simple coordinate object that implements the required methods
+                                $coordObj = new class($coord['lat'], $coord['lng']) {
+                                    private $lat, $lng;
+                                    
+                                    public function __construct($lat, $lng) {
+                                        $this->lat = $lat;
+                                        $this->lng = $lng;
+                                    }
+                                    
+                                    public function GetLatitude() { return $this->lat; }
+                                    public function GetLongitude() { return $this->lng; }
+                                    public function IsValid() { return !empty($this->lat) && !empty($this->lng); }
+                                };
+                                
+                                $polygonForMap['Coords'][] = $coordObj;
+                            }
+                            
+                            // Add to PolygoneData array
+                            $this->PolygoneData[] = $polygonForMap;
+                            
+                            error_log("Added " . $polygonResult['level'] . " polygon '" . $polygonResult['name'] . "' with " . count($polygonResult['coordinates']) . " points");
+                            
+                            if ($this->Debug) {
+                                error_log("Spatial polygon added - Level: " . $polygonResult['level'] . ", Entity: " . $polygonResult['entityType'] . ", Points: " . count($polygonResult['coordinates']));
+                            }
+                        } else {
+                            error_log("No polygon found for marker $i at coordinates: $latitude, $longitude");
+                        }
+                    } else {
+                        error_log("Marker $i has no valid position");
                     }
                 }
-                /*
-                    
-                */
-            $rendered .="});\n";
-            return $rendered;
+                
+                error_log("Spatial data service processing complete. Total polygons in PolygoneData: " . count($this->PolygoneData));
+                error_log("Cache performance - Hits: $cacheHits, Misses: $cacheMisses, Hit Rate: " . 
+                         ($cacheHits + $cacheMisses > 0 ? round(($cacheHits / ($cacheHits + $cacheMisses)) * 100, 1) : 0) . "%");
+            } else {
+                error_log("No markers found for spatial data service");
+            }
+            
+            // Return empty string as polygons will be rendered by RenderPolygones
+            return "";
         }
         return "";
     }
@@ -1085,6 +1118,7 @@ class Map extends ViewableData
         $rendered .= $this->RenderMarkers($mapVariable);
         $rendered .= $this->RenderMapCenteringOnPins($mapVariable);
         $rendered .= $this->RenderClusterLayer($mapVariable);
+        //do not change the order RenderSpatialDataService must before RenderPolygones because it adds Polgyones
         $rendered .= $this->RenderSpatialDataService($mapVariable);
         $rendered .= $this->RenderPolygones($mapVariable);
         
@@ -1190,7 +1224,6 @@ class Map extends ViewableData
         
         // Step 2: Try to get polygon using different administrative levels
         $polygonData = null;
-        
         // Try municipality (city/village) first
         if (isset($address['address']['municipality'])) {
             $polygonData = $this->fetchPolygonByEntity($latitude, $longitude, 'Municipality', $apiKey);
@@ -1199,7 +1232,6 @@ class Map extends ViewableData
                 $polygonData['name'] = $address['address']['municipality'];
             }
         }
-        
         // If no municipality polygon, try county/subdivision
         if (!$polygonData && isset($address['address']['countrySubdivision'])) {
             $polygonData = $this->fetchPolygonByEntity($latitude, $longitude, 'CountrySubdivision', $apiKey);
@@ -1231,7 +1263,16 @@ class Map extends ViewableData
             // Add additional address information
             $polygonData['address'] = $address['address'];
             $polygonData['coordinate'] = ['lat' => $latitude, 'lon' => $longitude];
+            
+            // Add map rendering data for easy integration
+            $polygonData['mapData'] = $this->formatPolygonForMapRendering($polygonData);
+            
             error_log("Successfully found polygon for coordinate at " . $polygonData['level'] . " level: " . $polygonData['name']);
+            
+            // Debug output (only in debug mode)
+            if ($this->Debug) {
+                error_log("Polygon data summary - Type: " . $polygonData['type'] . ", Points: " . count($polygonData['coordinates']) . ", Entity: " . $polygonData['entityType']);
+            }
         } else {
             error_log("No polygon found for coordinate: $latitude, $longitude");
         }
@@ -1249,83 +1290,176 @@ class Map extends ViewableData
      */
     private function fetchPolygonByEntity($latitude, $longitude, $entityType, $apiKey)
     {
-        $polygonUrl = "https://atlas.microsoft.com/search/polygon/json";
-        $polygonParams = [
-            'api-version' => '1.0',
-            'subscription-key' => $apiKey,
-            'coordinates' => $longitude . ',' . $latitude, // Note: longitude first for Azure Maps
-            'entityType' => $entityType,
-            'returnGeometry' => true
+        // Step 1: First do a reverse geocoding search to get the geometry ID
+        $searchUrl = "https://atlas.microsoft.com/search/address/reverse/json";
+        
+        // Map entity types to search entity types for reverse geocoding
+        $entityTypeMapping = [
+            'Municipality' => 'Municipality',
+            'CountrySubdivision' => 'CountrySubdivision', 
+            'CountrySecondarySubdivision' => 'CountrySecondarySubdivision',
+            'Country' => 'Country'
         ];
         
-        error_log("Fetching $entityType polygon for coordinate: $latitude, $longitude");
-        $response = $this->makeHttpRequest($polygonUrl, $polygonParams);
+        $searchEntityType = $entityTypeMapping[$entityType] ?? 'Municipality';
         
-        if (!$response || !isset($response['geometries']) || empty($response['geometries'])) {
-            error_log("No $entityType polygon found for coordinate");
+        $searchParams = [
+            'api-version' => '1.0',
+            'subscription-key' => $apiKey,
+            'query' => $latitude . ',' . $longitude,
+            'entityType' => $searchEntityType,
+            'returnGeometry' => 'true'
+        ];
+        
+        error_log("Step 1: Searching for $entityType at coordinate: $latitude, $longitude");
+        error_log("Search URL: " . $searchUrl . "?" . http_build_query($searchParams));
+        
+        $searchResponse = $this->makeHttpRequest($searchUrl, $searchParams, 'GET');
+        
+        if (!$searchResponse) {
+            error_log("No response received from reverse geocoding API");
             return null;
         }
         
-        $geometry = $response['geometries'][0];
+        // Check if we have results with geometry
+        if (!isset($searchResponse['addresses']) || empty($searchResponse['addresses'])) {
+            error_log("No addresses found in reverse geocoding response for $entityType");
+            if (isset($searchResponse['summary'])) {
+                error_log("Search summary: " . json_encode($searchResponse['summary']));
+            }
+            return null;
+        }
         
-        // Extract polygon coordinates
-        if (isset($geometry['geometryData']) && isset($geometry['geometryData']['geometry'])) {
-            $geoData = $geometry['geometryData']['geometry'];
+        $geometryId = null;
+        foreach ($searchResponse['addresses'] as $address) {
+            if (isset($address['dataSources']['geometry']['id'])) {
+                $geometryId = $address['dataSources']['geometry']['id'];
+                error_log("Found geometry ID: $geometryId for $entityType");
+                break;
+            }
+        }
+        
+        if (!$geometryId) {
+            error_log("No geometry ID found in reverse geocoding response for $entityType");
+            return null;
+        }
+        
+        // Step 2: Use the geometry ID to fetch the polygon data
+        $polygonUrl = "https://atlas.microsoft.com/search/polygon/json";
+        
+        $polygonParams = [
+            'api-version' => '1.0',
+            'subscription-key' => $apiKey,
+            'geometries' => $geometryId
+        ];
+        
+        error_log("Step 2: Fetching polygon data using geometry ID: $geometryId");
+        error_log("Polygon URL: " . $polygonUrl . "?" . http_build_query($polygonParams));
+        
+        $polygonResponse = $this->makeHttpRequest($polygonUrl, $polygonParams, 'GET');
+        if (!$polygonResponse) {
+            error_log("No response received from polygon API");
+            return null;
+        }
+        
+        // Check if we have the expected response structure
+        if (!isset($polygonResponse['additionalData']) || empty($polygonResponse['additionalData'])) {
+            error_log("No additionalData found in polygon response for $entityType");
+            error_log("Response keys: " . implode(', ', array_keys($polygonResponse)));
+            return null;
+        }
+        
+        $polygonData = $polygonResponse['additionalData'][0];
+        
+        // Check if we have geometry data
+        if (!isset($polygonData['geometryData'])) {
+            error_log("No geometryData found in polygon response");
+            return null;
+        }
+        
+        $geometryData = $polygonData['geometryData'];
+        
+        // Handle GeoJSON FeatureCollection format
+        if (isset($geometryData['type']) && $geometryData['type'] === 'FeatureCollection' && isset($geometryData['features'])) {
+            foreach ($geometryData['features'] as $feature) {
+                if (isset($feature['geometry'])) {
+                    $geoData = $feature['geometry'];
+                    break;
+                }
+            }
+        } elseif (isset($geometryData['geometry'])) {
+            // Standard GeoJSON format
+            $geoData = $geometryData['geometry'];
+        } elseif (isset($geometryData['type']) && isset($geometryData['coordinates'])) {
+            // Direct GeoJSON format
+            $geoData = $geometryData;
+        } else {
+            error_log("Unknown geometry data format");
+            error_log("GeometryData keys: " . implode(', ', array_keys($geometryData)));
+            return null;
+        }
+        
+        if (!isset($geoData)) {
+            error_log("Could not extract geometry data from response");
+            return null;
+        }
+        
+        // Process the geometry data
+        if ($geoData['type'] === 'Polygon' && isset($geoData['coordinates'])) {
+            $coordinates = $geoData['coordinates'][0]; // Get outer ring
             
-            if ($geoData['type'] === 'Polygon' && isset($geoData['coordinates'])) {
-                $coordinates = $geoData['coordinates'][0]; // Get outer ring
-                
-                // Convert to lat/lng format (Azure Maps returns lng/lat)
+            // Convert to lat/lng format (Azure Maps returns lng/lat)
+            $polygonPoints = [];
+            foreach ($coordinates as $coord) {
+                $polygonPoints[] = [
+                    'lat' => $coord[1], 
+                    'lng' => $coord[0]
+                ];
+            }
+            
+            error_log("Found $entityType polygon with " . count($polygonPoints) . " points");
+            
+            return [
+                'type' => 'polygon',
+                'entityType' => $entityType,
+                'coordinates' => $polygonPoints,
+                'rawGeometry' => $geoData,
+                'properties' => isset($polygonData['properties']) ? $polygonData['properties'] : [],
+                'geometryId' => $geometryId
+            ];
+        }
+        elseif ($geoData['type'] === 'MultiPolygon' && isset($geoData['coordinates'])) {
+            // Handle MultiPolygon - take the largest polygon
+            $largestPolygon = null;
+            $maxPoints = 0;
+            
+            foreach ($geoData['coordinates'] as $polygon) {
+                $coordinates = $polygon[0]; // Get outer ring
+                if (count($coordinates) > $maxPoints) {
+                    $maxPoints = count($coordinates);
+                    $largestPolygon = $coordinates;
+                }
+            }
+            
+            if ($largestPolygon) {
                 $polygonPoints = [];
-                foreach ($coordinates as $coord) {
+                foreach ($largestPolygon as $coord) {
                     $polygonPoints[] = [
                         'lat' => $coord[1], 
                         'lng' => $coord[0]
                     ];
                 }
                 
-                error_log("Found $entityType polygon with " . count($polygonPoints) . " points");
+                error_log("Found $entityType MultiPolygon, using largest with " . count($polygonPoints) . " points");
                 
                 return [
-                    'type' => 'polygon',
+                    'type' => 'multipolygon',
                     'entityType' => $entityType,
                     'coordinates' => $polygonPoints,
                     'rawGeometry' => $geoData,
-                    'properties' => isset($geometry['properties']) ? $geometry['properties'] : []
+                    'properties' => isset($polygonData['properties']) ? $polygonData['properties'] : [],
+                    'geometryId' => $geometryId
                 ];
-            }
-            elseif ($geoData['type'] === 'MultiPolygon' && isset($geoData['coordinates'])) {
-                // Handle MultiPolygon - take the largest polygon
-                $largestPolygon = null;
-                $maxPoints = 0;
-                
-                foreach ($geoData['coordinates'] as $polygon) {
-                    $coordinates = $polygon[0]; // Get outer ring
-                    if (count($coordinates) > $maxPoints) {
-                        $maxPoints = count($coordinates);
-                        $largestPolygon = $coordinates;
-                    }
-                }
-                
-                if ($largestPolygon) {
-                    $polygonPoints = [];
-                    foreach ($largestPolygon as $coord) {
-                        $polygonPoints[] = [
-                            'lat' => $coord[1], 
-                            'lng' => $coord[0]
-                        ];
-                    }
-                    
-                    error_log("Found $entityType MultiPolygon, using largest with " . count($polygonPoints) . " points");
-                    
-                    return [
-                        'type' => 'multipolygon',
-                        'entityType' => $entityType,
-                        'coordinates' => $polygonPoints,
-                        'rawGeometry' => $geoData,
-                        'properties' => isset($geometry['properties']) ? $geometry['properties'] : []
-                    ];
-                }
             }
         }
         
@@ -1474,7 +1608,7 @@ class Map extends ViewableData
      * @param string $method HTTP method (GET or POST)
      * @return array|null Decoded JSON response or null on failure
      */
-    private function makeHttpRequest($url, $params = [], $method = 'GET')
+    private function makeHttpRequest($url, $params = [], $method = 'GET',$debug = false)
     {
         // Build query string for GET requests or URL with params
         if ($method === 'GET' && !empty($params)) {
@@ -1514,6 +1648,10 @@ class Map extends ViewableData
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
         curl_close($ch);
+        if($debug)
+        {
+            Debug::Dump(json_decode($response));die;
+        }
         
         // Handle cURL errors
         if ($response === false || !empty($error)) {
@@ -1594,5 +1732,424 @@ class Map extends ViewableData
         }
         
         return $script;
+    }
+    
+    /**
+     * Format polygon data for map rendering integration
+     * @param array $polygonData Raw polygon data from fetchPolygonByEntity
+     * @return array Formatted data ready for map rendering
+     */
+    private function formatPolygonForMapRendering($polygonData)
+    {
+        if (!$polygonData || !isset($polygonData['coordinates'])) {
+            return null;
+        }
+        
+        // Convert coordinates to the format expected by Azure Maps
+        $azureMapCoords = [];
+        foreach ($polygonData['coordinates'] as $coord) {
+            // Azure Maps expects [longitude, latitude] format
+            $azureMapCoords[] = [$coord['lng'], $coord['lat']];
+        }
+        
+        // Ensure polygon is closed (first point = last point)
+        if (count($azureMapCoords) > 0) {
+            $firstPoint = $azureMapCoords[0];
+            $lastPoint = end($azureMapCoords);
+            if ($firstPoint[0] !== $lastPoint[0] || $firstPoint[1] !== $lastPoint[1]) {
+                $azureMapCoords[] = $firstPoint; // Close the polygon
+            }
+        }
+        
+        return [
+            'type' => 'Feature',
+            'geometry' => [
+                'type' => $polygonData['type'] === 'multipolygon' ? 'MultiPolygon' : 'Polygon',
+                'coordinates' => $polygonData['type'] === 'multipolygon' ? [$azureMapCoords] : [$azureMapCoords]
+            ],
+            'properties' => array_merge($polygonData['properties'] ?? [], [
+                'entityType' => $polygonData['entityType'],
+                'level' => $polygonData['level'] ?? '',
+                'name' => $polygonData['name'] ?? '',
+                'geometryId' => $polygonData['geometryId'] ?? '',
+                'fillColor' => $this->getPolygonColorByLevel($polygonData['level'] ?? ''),
+                'strokeColor' => $this->getPolygonStrokeColorByLevel($polygonData['level'] ?? ''),
+                'fillOpacity' => 0.3,
+                'strokeWidth' => 2
+            ])
+        ];
+    }
+    
+    /**
+     * Get polygon fill color based on administrative level
+     * @param string $level Administrative level (municipality, county, state, country)
+     * @return string CSS color value
+     */
+    private function getPolygonColorByLevel($level)
+    {
+        switch (strtolower($level)) {
+            case 'municipality':
+                return 'rgba(13, 66, 104, 0.4)'; // Blue for cities/municipalities
+            case 'county':
+                return 'rgba(255, 165, 0, 0.4)'; // Orange for counties  
+            case 'state':
+                return 'rgba(46, 125, 50, 0.4)'; // Green for states
+            case 'country':
+                return 'rgba(156, 39, 176, 0.4)'; // Purple for countries
+            default:
+                return 'rgba(13, 66, 104, 0.4)'; // Default blue
+        }
+    }
+    
+    /**
+     * Get polygon stroke color based on administrative level
+     * @param string $level Administrative level (municipality, county, state, country)
+     * @return string CSS color value
+     */
+    private function getPolygonStrokeColorByLevel($level)
+    {
+        switch (strtolower($level)) {
+            case 'municipality':
+                return '#0d4268'; // Dark blue for cities/municipalities
+            case 'county':
+                return '#ff6f00'; // Dark orange for counties
+            case 'state':
+                return '#2e7d32'; // Dark green for states
+            case 'country':
+                return '#7b1fa2'; // Dark purple for countries
+            default:
+                return '#0d4268'; // Default dark blue
+        }
+    }
+    
+    /**
+     * Add a polygon from coordinate search results to the map
+     * @param float $latitude The latitude coordinate to search
+     * @param float $longitude The longitude coordinate to search
+     * @param array $options Optional search options
+     * @return bool True if polygon was found and added, false otherwise
+     */
+    public function addPolygonFromCoordinate($latitude, $longitude, $options = [])
+    {
+        $polygonData = $this->getPolygonForCoordinate($latitude, $longitude, $options);
+        
+        if (!$polygonData || !isset($polygonData['coordinates'])) {
+            return false;
+        }
+        
+        // Convert the polygon data to the format expected by setPolygoneData
+        $polygonForMap = [
+            'Coords' => []
+        ];
+        
+        foreach ($polygonData['coordinates'] as $coord) {
+            $polygonForMap['Coords'][] = [
+                'lat' => $coord['lat'],
+                'lng' => $coord['lng']
+            ];
+        }
+        
+        // Add to existing polygon data or create new array
+        if (!$this->PolygoneData) {
+            $this->PolygoneData = [];
+        }
+        
+        $this->PolygoneData[] = $polygonForMap;
+        
+        // Log success
+        if ($this->Debug) {
+            error_log("Added " . $polygonData['level'] . " polygon '" . $polygonData['name'] . "' with " . count($polygonData['coordinates']) . " points to map");
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Clear all polygon data from the map
+     */
+    public function clearPolygons()
+    {
+        $this->PolygoneData = [];
+        return $this;
+    }
+    
+    /**
+     * Get the current polygon data
+     * @return array Current polygon data
+     */
+    public function getPolygonData()
+    {
+        return $this->PolygoneData ?? [];
+    }
+
+    // Cache configuration
+    private $cacheDirectory = null;
+    
+    /**
+     * Set custom cache directory for polygon data
+     * @param string $directory Absolute path to cache directory
+     * @return $this
+     */
+    public function setCacheDirectory($directory)
+    {
+        $this->cacheDirectory = $directory;
+        return $this;
+    }
+    
+    /**
+     * Get the cache directory path
+     * @return string Cache directory path
+     */
+    private function getCacheDirectory()
+    {
+        if ($this->cacheDirectory) {
+            return $this->cacheDirectory;
+        }
+        
+        // Use public folder with AzureMapCacheFolder directory
+        $defaultCacheDir = dirname(__DIR__, 3) . '/public/AzureMapCacheFolder';
+        
+        // Create directory if it doesn't exist
+        if (!is_dir($defaultCacheDir)) {
+            if (!mkdir($defaultCacheDir, 0755, true)) {
+                error_log("Failed to create polygon cache directory: $defaultCacheDir");
+                return null;
+            }
+        }
+        
+        return $defaultCacheDir;
+    }
+    
+    /**
+     * Generate cache key for a coordinate
+     * @param float $latitude Latitude coordinate
+     * @param float $longitude Longitude coordinate
+     * @param int $precision Decimal precision for coordinates (default: 4)
+     * @return string Cache key
+     */
+    private function generateCacheKey($latitude, $longitude, $precision = 4)
+    {
+        // Round coordinates to reduce cache fragmentation
+        $roundedLat = round($latitude, $precision);
+        $roundedLng = round($longitude, $precision);
+        
+        return 'polygon_' . md5("{$roundedLat},{$roundedLng}");
+    }
+    
+    /**
+     * Get polygon data from cache
+     * @param float $latitude Latitude coordinate
+     * @param float $longitude Longitude coordinate
+     * @return array|null Cached polygon data or null if not found
+     */
+    private function getPolygonFromCache($latitude, $longitude)
+    {
+        $cacheDir = $this->getCacheDirectory();
+        if (!$cacheDir) {
+            return null;
+        }
+        
+        $cacheKey = $this->generateCacheKey($latitude, $longitude);
+        $cacheFile = $cacheDir . '/' . $cacheKey . '.json';
+        
+        if (!file_exists($cacheFile)) {
+            if ($this->Debug) {
+                error_log("Polygon cache miss for coordinates: $latitude, $longitude");
+            }
+            return null;
+        }
+        
+        $cacheContent = file_get_contents($cacheFile);
+        if ($cacheContent === false) {
+            error_log("Failed to read polygon cache file: $cacheFile");
+            return null;
+        }
+        
+        $cachedData = json_decode($cacheContent, true);
+        if ($cachedData === null) {
+            error_log("Failed to decode polygon cache data: $cacheFile");
+            unlink($cacheFile);
+            return null;
+        }
+        
+        if ($this->Debug) {
+            error_log("Polygon cache hit for coordinates: $latitude, $longitude");
+        }
+        
+        return $cachedData;
+    }
+    
+    /**
+     * Save polygon data to cache
+     * @param float $latitude Latitude coordinate
+     * @param float $longitude Longitude coordinate
+     * @param array $polygonData Polygon data to cache
+     * @return bool Success status
+     */
+    private function savePolygonToCache($latitude, $longitude, $polygonData)
+    {
+        $cacheDir = $this->getCacheDirectory();
+        if (!$cacheDir) {
+            return false;
+        }
+        $cacheKey = $this->generateCacheKey($latitude, $longitude);
+        $cacheFile = $cacheDir . '/' . $cacheKey . '.json';
+        
+        // Add cache metadata
+        $cacheData = [
+            'timestamp' => time(),
+            'coordinates' => ['lat' => $latitude, 'lng' => $longitude],
+            'data' => $polygonData
+        ];
+        
+        $jsonData = json_encode($cacheData, JSON_PRETTY_PRINT);
+        if ($jsonData === false) {
+            error_log("Failed to encode polygon data for cache");
+            return false;
+        }
+        
+        $result = file_put_contents($cacheFile, $jsonData, LOCK_EX);
+        if ($result === false) {
+            error_log("Failed to write polygon cache file: $cacheFile");
+            return false;
+        }
+        
+        if ($this->Debug) {
+            error_log("Polygon data cached for coordinates: $latitude, $longitude");
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Clear all polygon cache files
+     * @return array Results with counts of deleted files and errors
+     */
+    public function clearPolygonCache()
+    {
+        $result = [
+            'success' => false,
+            'deleted_files' => 0,
+            'errors' => 0,
+            'message' => ''
+        ];
+        
+        $cacheDir = $this->getCacheDirectory();
+        if (!$cacheDir) {
+            $result['message'] = 'Cache directory not accessible';
+            return $result;
+        }
+        
+        if (!is_dir($cacheDir)) {
+            $result['success'] = true;
+            $result['message'] = 'Cache directory does not exist';
+            return $result;
+        }
+        
+        $files = glob($cacheDir . '/polygon_*.json');
+        
+        foreach ($files as $file) {
+            if (unlink($file)) {
+                $result['deleted_files']++;
+            } else {
+                $result['errors']++;
+                error_log("Failed to delete cache file: $file");
+            }
+        }
+        
+        $result['success'] = true;
+        $result['message'] = "Deleted {$result['deleted_files']} cache files";
+        
+        if ($result['errors'] > 0) {
+            $result['message'] .= " with {$result['errors']} errors";
+        }
+        
+        error_log("Polygon cache cleared: {$result['message']}");
+        
+        return $result;
+    }
+    
+    /**
+     * Clear polygon cache for specific coordinate
+     * @param float $latitude Latitude coordinate
+     * @param float $longitude Longitude coordinate
+     * @return bool Success status
+     */
+    public function clearPolygonCacheForCoordinate($latitude, $longitude)
+    {
+        $cacheDir = $this->getCacheDirectory();
+        if (!$cacheDir) {
+            return false;
+        }
+        
+        $cacheKey = $this->generateCacheKey($latitude, $longitude);
+        $cacheFile = $cacheDir . '/' . $cacheKey . '.json';
+        
+        if (file_exists($cacheFile)) {
+            if (unlink($cacheFile)) {
+                error_log("Cleared polygon cache for coordinates: $latitude, $longitude");
+                return true;
+            } else {
+                error_log("Failed to clear polygon cache for coordinates: $latitude, $longitude");
+                return false;
+            }
+        }
+        
+        return true; // File doesn't exist, consider it cleared
+    }
+    
+    /**
+     * Get cache statistics
+     * @return array Cache statistics
+     */
+    public function getPolygonCacheStats()
+    {
+        $stats = [
+            'directory' => $this->getCacheDirectory(),
+            'total_files' => 0,
+            'total_size_bytes' => 0,
+            'oldest_file' => null,
+            'newest_file' => null
+        ];
+        
+        $cacheDir = $this->getCacheDirectory();
+        if (!$cacheDir || !is_dir($cacheDir)) {
+            return $stats;
+        }
+        
+        $files = glob($cacheDir . '/polygon_*.json');
+        $stats['total_files'] = count($files);
+        
+        $totalSize = 0;
+        $oldestTime = null;
+        $newestTime = null;
+        
+        foreach ($files as $file) {
+            $size = filesize($file);
+            $time = filemtime($file);
+            
+            $totalSize += $size;
+            
+            if ($oldestTime === null || $time < $oldestTime) {
+                $oldestTime = $time;
+            }
+            
+            if ($newestTime === null || $time > $newestTime) {
+                $newestTime = $time;
+            }
+        }
+        
+        $stats['total_size_bytes'] = $totalSize;
+        $stats['total_size_mb'] = round($totalSize / 1024 / 1024, 2);
+        
+        if ($oldestTime) {
+            $stats['oldest_file'] = date('Y-m-d H:i:s', $oldestTime);
+        }
+        
+        if ($newestTime) {
+            $stats['newest_file'] = date('Y-m-d H:i:s', $newestTime);
+        }
+        
+        return $stats;
     }
 }
