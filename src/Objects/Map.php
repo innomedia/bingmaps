@@ -70,6 +70,8 @@ class Map extends ViewableData
     private $ZoomButtonsPosition = "top-right";
     private $CompassPosition = "bottom-right";
     private $MarkerAnchor = "bottom";
+    private $IsUserCentrics = false;
+
     /*
       • AdminDivision1: First administrative level within the country/region level, such as a state or a province.
   • AdminDivision2: Second administrative level within the country/region level, such as a county.
@@ -107,6 +109,11 @@ class Map extends ViewableData
             return "{$type}('{$message}');\n";
         }
         return "";
+    }
+    public function SetIsUserCentrics($value)
+    {
+        $this->IsUserCentrics = $value;
+        return $this;
     }
     public function SetCenterOnPins($value)
     {
@@ -336,6 +343,7 @@ class Map extends ViewableData
             "Script" => $this->RenderFunction(),
             "ID" => $this->ID,
             "Styles" => $this->Style,
+            "IsUserCentrics" => $this->IsUserCentrics
         ];
     }
     public function GetLoadOnStartClass()
@@ -1011,6 +1019,24 @@ class Map extends ViewableData
         
         $rendered .= "var InfoBoxCollection = [];\n";
         $rendered .= $this->debugLog("Starting Azure Maps initialization for map ID: {$this->ID}");
+        
+        // Function to dynamically load Azure Maps CSS
+        $rendered .= "function loadAzureMapCSS() {\n";
+        $rendered .= "    // Check if CSS is already loaded\n";
+        $rendered .= "    var existingLink = document.querySelector('link[href*=\"atlas.min.css\"]');\n";
+        $rendered .= "    if (!existingLink) {\n";
+        $rendered .= "        var link = document.createElement('link');\n";
+        $rendered .= "        link.rel = 'stylesheet';\n";
+        $rendered .= "        link.type = 'text/css';\n";
+        $rendered .= "        link.href = 'https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.css';\n";
+        $rendered .= "        document.head.appendChild(link);\n";
+        $rendered .= "        " . ($this->Debug ? "console.log('Azure Maps CSS loaded dynamically');\n" : "") . "";
+        $rendered .= "    }\n";
+        $rendered .= "}\n";
+        $rendered .= "\n";
+        $rendered .= "// Load CSS immediately\n";
+        $rendered .= "loadAzureMapCSS();\n";
+        $rendered .= "\n";
         
         // WebGL detection function
         $rendered .= "function checkWebGLSupport() {\n";
