@@ -1096,8 +1096,16 @@ class Map extends ViewableData
         $rendered .= "function GetMap{$this->ID}(){\n";
         $mapVariable = "map" . $this->ID;
 
+        // Check if atlas library is loaded before trying to create map
         $rendered .= "
-            " . ($this->Debug ? "console.log('Creating Azure Map...');\n" : "") . "
+            // Check if Azure Maps atlas library is available
+            if (typeof atlas === 'undefined') {
+                console.error('Azure Maps atlas library is not loaded');
+                showMapError('Azure Maps library is not available. Please check your internet connection and try refreshing the page.');
+                return;
+            }
+            
+            " . ($this->Debug ? "console.log('Atlas library available, creating Azure Map...');\n" : "") . "
             try {
                 var $mapVariable = new atlas.Map('MapContainer{$this->ID}',{
                     center:{$this->RenderLocation()}{$this->RenderZoom()}{$this->RenderMapTypeID()},
