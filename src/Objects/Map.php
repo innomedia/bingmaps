@@ -364,7 +364,7 @@ class Map extends ViewableData
     }
     public function SetDarkMapType()
     {
-        return $this->SetMapType("'dark'");
+        return $this->SetMapType("'grayscale_dark'");
     }
     //Default when nothing is set
     public function SetLightMapType()
@@ -1108,7 +1108,7 @@ class Map extends ViewableData
         }
         if($this->IsUserCentrics)
         {
-            $Attributes .= 'data-usercentrics="Azure Maps asdf" type="text/plain" ';
+            $Attributes .= 'data-usercentrics="Azure Maps" type="text/plain" ';
         }
         if ($this->loadOnStartClass != "" || $Attributes != "") {
             $rendered .= "<script class='$this->loadOnStartClass' $Attributes>\n";
