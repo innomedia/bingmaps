@@ -1,5 +1,5 @@
 <!-- Azure Maps JS -->
-<script<% if IsUserCentrics %> data-usercentrics="Azure Maps"  type="text/plain" <% end_if %> src="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.js"></script>
+<script<% if IsUserCentrics %> data-usercentrics="Azure Maps"  type="text/plain" <% end_if %>src="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.js"></script>
 
 <div id="MapContainer{$ID}" style='$Styles'></div>
 $Script.RAW

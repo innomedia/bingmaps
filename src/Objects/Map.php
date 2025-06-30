@@ -1011,6 +1011,10 @@ class Map extends ViewableData
                 $Attributes .= $key.'="'.$value.'" ';
             }
         }
+        if($this->IsUserCentrics)
+        {
+            $Attributes .= 'data-usercentrics="Azure Maps asdf" type="text/plain" ';
+        }
         if ($this->loadOnStartClass != "" || $Attributes != "") {
             $rendered .= "<script class='$this->loadOnStartClass' $Attributes>\n";
         } else {
