@@ -313,7 +313,7 @@ class Map extends ViewableData
     }
     public function SetDarkMapType()
     {
-        return $this->SetMapType("'dark'");
+        return $this->SetMapType("'grayscale_dark'");
     }
     //Default when nothing is set
     public function SetLightMapType()
