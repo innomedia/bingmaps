@@ -57,6 +57,12 @@ class Map extends ViewableData
     private $SpatialDataServicePostalCodes = null;
     private $PolygoneData = [];
     
+    // Cluster customization properties
+    private $ClusterColors = ['#51bbd6', '#f1f075', '#f28cb1', '#e55e5e']; // Default cluster colors
+    private $ClusterColorSteps = [10, 50, 100]; // Point count thresholds for color changes
+    private $ClusterStrokeColor = 'white';
+    private $ClusterStrokeWidth = 2;
+    
     // Additional Azure Maps specific options
     private $DisablePanning = false;
     private $DisableZooming = false;
@@ -155,6 +161,51 @@ class Map extends ViewableData
         $this->PolygoneData = $value;
         return $this;
     }
+    
+    /**
+     * Set custom colors for cluster bubbles
+     * @param array $colors Array of color values for different cluster sizes
+     * @return $this
+     */
+    public function SetClusterColors($colors)
+    {
+        $this->ClusterColors = $colors;
+        return $this;
+    }
+    
+    /**
+     * Set the point count thresholds for cluster color changes
+     * @param array $steps Array of point count thresholds (e.g., [10, 50, 100])
+     * @return $this
+     */
+    public function SetClusterColorSteps($steps)
+    {
+        $this->ClusterColorSteps = $steps;
+        return $this;
+    }
+    
+    /**
+     * Set the stroke color for cluster bubbles
+     * @param string $color Color value (e.g., 'white', '#ffffff', 'rgb(255,255,255)')
+     * @return $this
+     */
+    public function SetClusterStrokeColor($color)
+    {
+        $this->ClusterStrokeColor = $color;
+        return $this;
+    }
+    
+    /**
+     * Set the stroke width for cluster bubbles
+     * @param int $width Width in pixels
+     * @return $this
+     */
+    public function SetClusterStrokeWidth($width)
+    {
+        $this->ClusterStrokeWidth = $width;
+        return $this;
+    }
+    
     public function SetZoom($value)
     {
         $this->Zoom = $value;
@@ -568,27 +619,20 @@ class Map extends ViewableData
             }
             
             // Create bubble layer for clusters with dynamic sizing
-            $rendered .= "{$mapVariable}.layers.add(new atlas.layer.BubbleLayer(clusterDataSource, null, {
-                radius: [
-                    'step',
-                    ['get', 'point_count'],
-                    15,        // Default radius for small clusters
-                    10, 20,    // If point_count >= 10, radius = 20
-                    50, 30,    // If point_count >= 50, radius = 30
-                    100, 40    // If point_count >= 100, radius = 40
-                ],
-                color: [
-                    'step',
-                    ['get', 'point_count'],
-                    '#51bbd6',   // Default color for small clusters
-                    10, '#f1f075',  // Yellow for medium clusters
-                    50, '#f28cb1',  // Pink for large clusters
-                    100, '#e55e5e'  // Red for very large clusters
-                ],
-                strokeColor: 'white',
-                strokeWidth: 2,
-                filter: ['has', 'point_count']
-            }));\n";
+            $rendered .= "{$mapVariable}.layers.add(new atlas.layer.BubbleLayer(clusterDataSource, null, {\n";
+            $rendered .= "                radius: [\n";
+            $rendered .= "                    'step',\n";
+            $rendered .= "                    ['get', 'point_count'],\n";
+            $rendered .= "                    15,        // Default radius for small clusters\n";
+            $rendered .= "                    10, 20,    // If point_count >= 10, radius = 20\n";
+            $rendered .= "                    50, 30,    // If point_count >= 50, radius = 30\n";
+            $rendered .= "                    100, 40    // If point_count >= 100, radius = 40\n";
+            $rendered .= "                ],\n";
+            $rendered .= "                color: " . $this->getClusterColorConfiguration() . ",\n";
+            $rendered .= "                strokeColor: '{$this->ClusterStrokeColor}',\n";
+            $rendered .= "                strokeWidth: {$this->ClusterStrokeWidth},\n";
+            $rendered .= "                filter: ['has', 'point_count']\n";
+            $rendered .= "            }));\n";
             $rendered .= $this->debugLog("Bubble layer added for clusters");
             
             // Create symbol layer for cluster count labels
@@ -619,7 +663,7 @@ class Map extends ViewableData
                 $rendered .= "        " . ($this->Debug ? "console.log('All cluster icons loaded, creating unclustered layer...');\n" : "") . "";
                 
                 // Create symbol layer for individual points (unclustered)
-                $rendered .= "        var unclusteredLayer = new atlas.layer.SymbolLayer(clusterDataSource, null, {\n";
+                $rendered .= "        var unclusteredLayer = new atlas.layer.SymbolLayer(clusterDataSource, 'unclustered-points', {\n";
                 $rendered .= "            filter: ['!', ['has', 'point_count']],\n";
                 $rendered .= "            iconOptions: {\n";
                 $rendered .= "                image: ['case',\n";
@@ -637,6 +681,8 @@ class Map extends ViewableData
                 $rendered .= "        });\n";
                 $rendered .= "        {$mapVariable}.layers.add(unclusteredLayer);\n";
                 $rendered .= "        " . ($this->Debug ? "console.log('Symbol layer added for individual points with custom icons');\n" : "") . "";
+                $rendered .= "        // Call function to add click events\n";
+                $rendered .= "        addUnclusteredClickEvents();\n";
                 $rendered .= "    }\n";
                 $rendered .= "}\n";
                 
@@ -655,33 +701,82 @@ class Map extends ViewableData
                 }
             } else {
                 // No custom icons, create unclustered layer immediately with default icon
-                $rendered .= "{$mapVariable}.layers.add(new atlas.layer.SymbolLayer(clusterDataSource, null, {\n";
+                $rendered .= "var unclusteredLayer = new atlas.layer.SymbolLayer(clusterDataSource, 'unclustered-points', {\n";
                 $rendered .= "    filter: ['!', ['has', 'point_count']],\n";
                 $rendered .= "    iconOptions: {\n";
                 $rendered .= "        image: 'pin-red',\n";
                 $rendered .= "        size: 1.0,\n";
                 $rendered .= "        anchor: '{$this->MarkerAnchor}'\n";
                 $rendered .= "    }\n";
-                $rendered .= "}));\n";
+                $rendered .= "});\n";
+                $rendered .= "{$mapVariable}.layers.add(unclusteredLayer);\n";
                 $rendered .= $this->debugLog("Symbol layer added for individual points with default icon");
             }
             
-            // Add click event for clusters to zoom in
+            // Add click event for clusters to zoom in and individual markers to show popups
             $rendered .= "{$mapVariable}.events.add('click', clusterDataSource, function(e) {\n";
             $rendered .= "    if (e.shapes && e.shapes.length > 0) {\n";
             $rendered .= "        var properties = e.shapes[0].getProperties();\n";
+            $rendered .= "        " . ($this->Debug ? "console.log('Cluster click event - properties:', properties);\n" : "") . "";
             $rendered .= "        if (properties.cluster) {\n";
             $rendered .= "            // This is a cluster, zoom in\n";
+            $rendered .= "            " . ($this->Debug ? "console.log('Clicking on cluster - zooming in');\n" : "") . "";
             $rendered .= "            {$mapVariable}.setCamera({\n";
             $rendered .= "                center: e.shapes[0].getCoordinates(),\n";
             $rendered .= "                zoom: {$mapVariable}.getCamera().zoom + 2\n";
             $rendered .= "            });\n";
             $rendered .= "        } else if (properties.popupContent) {\n";
             $rendered .= "            // This is an individual point with popup content\n";
+            $rendered .= "            " . ($this->Debug ? "console.log('Clicking on individual marker - showing popup');\n" : "") . "";
             $rendered .= "            showPopup(properties.popupContent, e.shapes[0].getCoordinates());\n";
+            $rendered .= "        } else {\n";
+            $rendered .= "            " . ($this->Debug ? "console.log('Click on marker without popup content');\n" : "") . "";
             $rendered .= "        }\n";
+            $rendered .= "    } else {\n";
+            $rendered .= "        " . ($this->Debug ? "console.log('Click event without shapes');\n" : "") . "";
             $rendered .= "    }\n";
             $rendered .= "});\n";
+            
+            // Also add click event specifically to the unclustered layer for better reliability
+            if (!empty($customIcons)) {
+                $rendered .= "// Add click event to unclustered layer after icons are loaded\n";
+                $rendered .= "function addUnclusteredClickEvents() {\n";
+                $rendered .= "    var unclusteredLayer = {$mapVariable}.layers.getLayerById('unclustered-points');\n";
+                $rendered .= "    if (unclusteredLayer) {\n";
+                $rendered .= "        " . ($this->Debug ? "console.log('Adding click events to unclustered layer');\n" : "") . "";
+                $rendered .= "        {$mapVariable}.events.add('click', unclusteredLayer, function(e) {\n";
+                $rendered .= "            if (e.shapes && e.shapes.length > 0) {\n";
+                $rendered .= "                var properties = e.shapes[0].getProperties();\n";
+                $rendered .= "                if (properties.popupContent) {\n";
+                $rendered .= "                    " . ($this->Debug ? "console.log('Unclustered layer click - showing popup');\n" : "") . "";
+                $rendered .= "                    showPopup(properties.popupContent, e.shapes[0].getCoordinates());\n";
+                $rendered .= "                }\n";
+                $rendered .= "            }\n";
+                $rendered .= "        });\n";
+                $rendered .= "    }\n";
+                $rendered .= "}\n";
+            } else {
+                $rendered .= "// Add click event to unclustered layer (no custom icons)\n";
+                $rendered .= "setTimeout(function() {\n";
+                $rendered .= "    var unclusteredLayers = {$mapVariable}.layers.getLayers().filter(function(layer) {\n";
+                $rendered .= "        return layer.getSource() === clusterDataSource && layer instanceof atlas.layer.SymbolLayer;\n";
+                $rendered .= "    });\n";
+                $rendered .= "    unclusteredLayers.forEach(function(layer) {\n";
+                $rendered .= "        if (layer.getOptions().filter && layer.getOptions().filter[0] === '!') {\n";
+                $rendered .= "            " . ($this->Debug ? "console.log('Adding click events to unclustered symbol layer');\n" : "") . "";
+                $rendered .= "            {$mapVariable}.events.add('click', layer, function(e) {\n";
+                $rendered .= "                if (e.shapes && e.shapes.length > 0) {\n";
+                $rendered .= "                    var properties = e.shapes[0].getProperties();\n";
+                $rendered .= "                    if (properties.popupContent) {\n";
+                $rendered .= "                        " . ($this->Debug ? "console.log('Symbol layer click - showing popup');\n" : "") . "";
+                $rendered .= "                        showPopup(properties.popupContent, e.shapes[0].getCoordinates());\n";
+                $rendered .= "                    }\n";
+                $rendered .= "                }\n";
+                $rendered .= "            });\n";
+                $rendered .= "        }\n";
+                $rendered .= "    });\n";
+                $rendered .= "}, 100);\n";
+            }
             
             // Add mouse enter event to change cursor
             $rendered .= "{$mapVariable}.events.add('mouseenter', clusterDataSource, function() {\n";
@@ -2189,5 +2284,40 @@ class Map extends ViewableData
         }
         
         return $stats;
+    }
+    
+    /**
+     * Generate the color configuration for cluster bubbles based on custom settings
+     * @return string JavaScript array expression for Azure Maps color styling
+     */
+    public function getClusterColorConfiguration()
+    {
+        $colorConfig = "[\n                    'step',\n                    ['get', 'point_count']";
+        
+        // Add the first color (for smallest clusters)
+        if (isset($this->ClusterColors[0])) {
+            $colorConfig .= ",\n                    '{$this->ClusterColors[0]}'";
+        } else {
+            $colorConfig .= ",\n                    '#51bbd6'"; // Default fallback
+        }
+        
+        // Add step colors based on thresholds
+        for ($i = 0; $i < count($this->ClusterColorSteps); $i++) {
+            $step = $this->ClusterColorSteps[$i];
+            $colorIndex = $i + 1;
+            
+            if (isset($this->ClusterColors[$colorIndex])) {
+                $color = $this->ClusterColors[$colorIndex];
+            } else {
+                // Fallback colors if not enough colors provided
+                $fallbackColors = ['#f1f075', '#f28cb1', '#e55e5e', '#ff4500', '#8b0000'];
+                $color = $fallbackColors[$i] ?? '#999999';
+            }
+            
+            $colorConfig .= ",\n                    {$step}, '{$color}'";
+        }
+        
+        $colorConfig .= "\n                ]";
+        return $colorConfig;
     }
 }
