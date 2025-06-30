@@ -4,22 +4,63 @@
 <div id="MapContainer{$ID}" style='$Styles'></div>
 $Script.RAW
 <% if IsUserCentrics %>
+    <script>
+        // Function to show cookie consent warning
+        function showCookieConsentWarning() {
+            var container = document.getElementById('MapContainer{$ID}');
+            if (container) {
+                container.innerHTML = '<div style="padding: 20px; text-align: center; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; color: #856404;">' +
+                                      '<div style="font-size: 18px; margin-bottom: 10px;">🍪</div>' +
+                                      '<strong><%t bingMap.COOKIE_CONSENT_REQUIRED "Cookie consent required" %></strong><br>' +
+                                      '<%t bingMap.COOKIE_CONSENT_MESSAGE "To display the map, please accept cookies in the cookie settings. The map requires Azure Maps cookies to function properly." %>' +
+                                      '</div>';
+            }
+        }
+
+        // Check UserCentrics consent status
+        function checkUserCentricsConsent() {
+            if (typeof UC_UI !== 'undefined' && UC_UI.getServicesBaseInfo) {
+                var services = UC_UI.getServicesBaseInfo();
+                var azureMapsService = services.find(function(service) {
+                    return service.name === 'Azure Maps' || service.id === 'Azure Maps';
+                });
+                
+                if (azureMapsService && !azureMapsService.consent.status) {
+                    console.log('Azure Maps cookies not accepted');
+                    showCookieConsentWarning();
+                    return false;
+                }
+                return true;
+            }
+            return false;
+        }
+
+        // Listen for UserCentrics events
+        if (typeof window.addEventListener !== 'undefined') {
+            window.addEventListener('UC_UI_INITIALIZED', function() {
+                console.log('UserCentrics initialized, checking consent...');
+                if (!checkUserCentricsConsent()) {
+                    return; // Don't proceed if consent not given
+                }
+            });
+
+            window.addEventListener('UC_UI_CMP_EVENT', function(event) {
+                console.log('UserCentrics CMP event:', event.detail);
+                if (event.detail && event.detail.type === 'consent_status_changed') {
+                    if (!checkUserCentricsConsent()) {
+                        return; // Don't proceed if consent not given
+                    }
+                }
+            });
+        }
+    </script>
+    
     <script data-usercentrics="Azure Maps"  type="text/plain">
         // Check if Azure Maps atlas library is loaded
         function checkAtlasLibrary() {
             if (typeof atlas === 'undefined') {
-                console.error('Azure Maps atlas library failed to load');
-                var container = document.getElementById('MapContainer{$ID}');
-                if (container) {
-                    container.innerHTML = '<div style="padding: 20px; text-align: center; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; color: #dc3545;">' +
-                                          '<strong>Map Loading Error:</strong><br>' +
-                                          'Azure Maps library (atlas.min.js) failed to load.<br>' +
-                                          'Please check your internet connection and try refreshing the page.' +
-                                          '</div>';
-                }
                 return false;
             } else {
-                console.log('Azure Maps atlas library loaded successfully');
                 return true;
             }
         }
@@ -40,7 +81,7 @@ $Script.RAW
                 clearInterval(atlasCheckInterval);
                 if (!atlasLoaded) {
                     console.error('Atlas library check timed out after 10 seconds');
-                    checkAtlasLibrary(); // Show error message
+                    showCookieConsentWarning(); // Show cookie warning instead of library error
                 }
                 return;
             }

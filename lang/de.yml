@@ -1,0 +1,4 @@
+de:
+  bingMap:
+    COOKIE_CONSENT_REQUIRED: 'Cookie-Zustimmung erforderlich'
+    COOKIE_CONSENT_MESSAGE: 'Um die Karte anzuzeigen, akzeptieren Sie bitte Cookies in den Cookie-Einstellungen. Die Karte benötigt Azure Maps-Cookies, um ordnungsgemäß zu funktionieren.'
