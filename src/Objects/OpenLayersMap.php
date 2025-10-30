@@ -1,30 +1,44 @@
 <?php
 namespace bingMap;
 
+use SilverStripe\ORM\FieldType\DBHTMLText;
+use SilverStripe\Model\ModelData;
 use bingMap\MapPosition;
-use SilverStripe\Dev\Debug;
-use SilverStripe\View\ViewableData;
-use SilverStripe\SiteConfig\SiteConfig;
 
-class OpenLayersMap extends ViewableData
+class OpenLayersMap extends ModelData
 {
     use MapPosition;
 
     private $Debug = true;
+    
     private $ID;
+    
     private $Style;
+    
     private $Height = 500;
+    
     private $Width = 500;
+    
     private $loadOnStartClass;
-    private $IconPath = null;
-    private $Base64Icon = null;
+    
+    private $IconPath;
+    
+    private $Base64Icon;
+    
     private $CenterOnPins = true;
+    
     private $Padding = 50;
-    private $Markers = [];
+    
+    private array $Markers = [];
+    
     private $ScriptSettings = [];
-    private $Zoom = null;
-    private $MouseWheelZoom = null;
-    private $MapType = null;
+    
+    private $Zoom;
+    
+    private ?bool $MouseWheelZoom = null;
+    
+    private $MapType;
+    
     private $ClusterLayer = false;
 
     public function __construct($ID = "1", $loadOnStartClass = "", $Debug = false)
@@ -34,115 +48,115 @@ class OpenLayersMap extends ViewableData
         $this->ID = $ID;
     }
     
-    public static function createMap($ID = "1", $loadOnStartClass = "", $Debug = false)
+    public static function createMap($ID = "1", $loadOnStartClass = "", $Debug = false): OpenLayersMap
     {
-        return new OpenLayersMap($ID, $loadOnStartClass, $Debug);
+        return OpenLayersMap::create($ID, $loadOnStartClass, $Debug);
     }
     
-    public function SetCenterOnPins($value)
+    public function SetCenterOnPins($value): static
     {
         $this->CenterOnPins = $value;
         return $this;
     }
     
-    public function setClusterLayer($value)
+    public function setClusterLayer($value): static
     {
         $this->ClusterLayer = $value;
         return $this;
     }
     
-    public function addScriptSetting($key,$value)
+    public function addScriptSetting($key,$value): static
     {
         $this->ScriptSettings[$key] = $value; 
         return $this;
     }
     
-    public function SetZoom($value)
+    public function SetZoom($value): static
     {
         $this->Zoom = $value;
         return $this;
     }
     
-    public function DisableMouseWheelZoom()
+    public function DisableMouseWheelZoom(): static
     {
         $this->MouseWheelZoom = true;
         return $this;
     }
     
-    public function SetIcon($IconPath)
+    public function SetIcon($IconPath): static
     {
         $this->IconPath = $IconPath;
         return $this;
     }
     
-    public function SetCenterOnPinsPadding($value)
+    public function SetCenterOnPinsPadding($value): static
     {
         $this->Padding = $value;
         return $this;
     }
     
-    public function SetBase64Icon($Base64)
+    public function SetBase64Icon($Base64): static
     {
         $this->Base64Icon = $Base64;
         return $this;
     }
     
-    public function SetStyle($style)
+    public function SetStyle($style): static
     {
         $this->Style = $style;
         return $this;
     }
     
-    public function SetHeight($pixel)
+    public function SetHeight($pixel): static
     {
         $this->Height = $pixel;
         return $this;
     }
     
-    public function SetWidth($pixel)
+    public function SetWidth($pixel): static
     {
         $this->Width = $pixel;
         return $this;
     }
     
-    public function SetMapType($Type)
+    public function SetMapType($Type): static
     {
         $this->MapType = $Type;
         return $this;
     }
     
-    public function SetDarkMapType()
+    public function SetDarkMapType(): static
     {
         return $this->SetMapType('dark');
     }
     
-    public function SetLightMapType()
+    public function SetLightMapType(): static
     {
         return $this->SetMapType('osm');
     }
     
-    public function SetGrayscaleMapType()
+    public function SetGrayscaleMapType(): static
     {
         return $this->SetMapType('grayscale');
     }
     
-    public function HasLoadOnStartClass()
+    public function HasLoadOnStartClass(): bool
     {
         return $this->loadOnStartClass != "";
     }
     
-    public function AddMarker($marker)
+    public function AddMarker($marker): void
     {
-        array_push($this->Markers, $marker);
+        $this->Markers[] = $marker;
     }
     
-    public function XML_val($field, $arguments = [], $cache = false)
+    public function XML_val($field, $arguments = [], $cache = false): DBHTMLText
     {
         $data = $this->getData();
         return $this->customise($data)->renderWith("openLayersMap");
     }
     
-    private function getData()
+    private function getData(): array
     {
         return [
             "Script" => $this->RenderFunction(),
@@ -156,24 +170,25 @@ class OpenLayersMap extends ViewableData
         return $this->loadOnStartClass;
     }
     
-    public static function GetIconVariable()
+    public static function GetIconVariable(): string
     {
         return "Icon";
     }
     
-    private function RenderMarkers($mapVariable)
+    private function RenderMarkers(string $mapVariable): string
     {
         $rendered = "";
         $rendered .= "console.log('Rendering " . count($this->Markers) . " markers...');\n";
         $rendered .= "var markers = [];\n";
         $rendered .= "var markerFeatures = [];\n";
+        $counter = count($this->Markers);
         
-        for ($i = 0; $i < count($this->Markers); $i++) {
+        for ($i = 0; $i < $counter; ++$i) {
             $rendered .= "console.log('Adding marker " . ($i + 1) . "...');\n";
             $rendered .= $this->Markers[$i]->RenderOpenLayers($mapVariable, $this->ClusterLayer);
         }
         
-        if (count($this->Markers) > 0) {
+        if ($this->Markers !== []) {
             $rendered .= "
             var vectorSource = new ol.source.Vector({
                 features: markerFeatures
@@ -206,13 +221,12 @@ class OpenLayersMap extends ViewableData
             ";
         }
         
-        $rendered .= "console.log('Markers rendering complete.');\n";
-        return $rendered;
+        return $rendered . "console.log('Markers rendering complete.');\n";
     }
     
-    private function RenderMapCenteringOnPins($mapVariable)
+    private function RenderMapCenteringOnPins(string $mapVariable): string
     {
-        if ($this->CenterOnPins == true && count($this->Markers) > 0) {
+        if ($this->CenterOnPins == true && $this->Markers !== []) {
             return "
             if (markerFeatures.length > 0) {
                 var extent = vectorSource.getExtent();
@@ -223,10 +237,11 @@ class OpenLayersMap extends ViewableData
             }
             ";
         }
+        
         return "";
     }
     
-    private function GetMapSource()
+    private function GetMapSource(): string
     {
         switch ($this->MapType) {
             case 'dark':
@@ -247,10 +262,11 @@ class OpenLayersMap extends ViewableData
         if ($this->Zoom != null) {
             return $this->Zoom;
         }
+        
         return 10;
     }
     
-    public function RenderFunction()
+    public function RenderFunction(): string|array|null
     {
         $rendered = "";
         $Attributes = "";
@@ -262,13 +278,13 @@ class OpenLayersMap extends ViewableData
             }
         }
         
-        if ($this->loadOnStartClass != "" || $Attributes != "") {
-            $rendered .= "<script class='$this->loadOnStartClass' $Attributes>\n";
+        if ($this->loadOnStartClass != "" || $Attributes !== "") {
+            $rendered .= "<script class='$this->loadOnStartClass' {$Attributes}>\n";
         } else {
             $rendered .= "<script type='text/javascript'>\n";
         }
         
-        $rendered .= "console.log('Starting OpenLayers map initialization for map ID: {$this->ID}');";
+        $rendered .= sprintf("console.log('Starting OpenLayers map initialization for map ID: %s');", $this->ID);
         $rendered .= "function GetMap{$this->ID}(){\n";
         $mapVariable = "map" . $this->ID;
 
@@ -314,17 +330,15 @@ class OpenLayersMap extends ViewableData
         $rendered .= "</script>\n";
         
         if (!$this->Debug) {
-            $rendered = HelperMethods::MinifyString($rendered);
-        } else {
-            $rendered = HelperMethods::RemoveEmptyLines($rendered);
+            return HelperMethods::MinifyString($rendered);
         }
 
-        return $rendered;
+        return HelperMethods::RemoveEmptyLines($rendered);
     }
     
-    public function GetReactData()
+    public function GetReactData(): array
     {
-        $data = [
+        return [
             "key" => $this->ID,
             "loadOnStartClass" => $this->loadOnStartClass,
             "centerOnPins" => $this->CenterOnPins,
@@ -333,16 +347,19 @@ class OpenLayersMap extends ViewableData
             "zoom" => $this->Zoom,
             "position" => $this->Coords->GetReactData(),
         ];
-        return $data;
     }
     
-    private function GetMarkersData()
+    /**
+     * @return mixed[]
+     */
+    private function GetMarkersData(): array
     {
         $MarkersData = [];
         $iconPath = $this->IconPath;
         foreach ($this->Markers as $Marker) {
             $MarkersData[] = $Marker->GetReactData($iconPath);
         }
+        
         return $MarkersData;
     }
     

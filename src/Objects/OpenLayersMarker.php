@@ -6,64 +6,68 @@ class OpenLayersMarker
 {
     use MapPosition;
     private $ID;
-    private $InfoBox = null;
-    private $IconPath = null;
-    private $Base64Icon = null;
-    private $IconVariable = null;
+    
+    private $InfoBox;
+    
+    private $IconPath;
+    
+    private $Base64Icon;
+    
+    private ?string $IconVariable = null;
 
-    private static $Suffix = "Marker";
+    private static string $Suffix = "Marker";
 
     public function __construct($ID)
     {
         $this->ID = $ID;
     }
     
-    public static function create($ID)
+    public static function create($ID): OpenLayersMarker
     {
         return new OpenLayersMarker($ID);
     }
     
-    public function SetInfoBox($InfoBox)
+    public function SetInfoBox($InfoBox): static
     {
         $InfoBox->SetID($this->ID);
         $this->InfoBox = $InfoBox;
         return $this;
     }
     
-    public function SetIconURL($IconPath)
+    public function SetIconURL($IconPath): static
     {
         $this->IconPath = $IconPath;
         return $this;
     }
     
-    public function SetBase64Icon($Base64)
+    public function SetBase64Icon($Base64): static
     {
         $this->Base64Icon = $Base64;
         return $this;
     }
     
-    public function SetIconVariable()
+    public function SetIconVariable(): static
     {
         $this->IconVariable = Map::GetIconVariable();
         return $this;
     }
     
-    public function GetMarkerVariable()
+    public function GetMarkerVariable(): string
     {
-        return "marker$this->ID";
+        return 'marker' . $this->ID;
     }
     
-    public function RenderOpenLayers($mapVariable, $ClusterEnabled)
+    public function RenderOpenLayers($mapVariable, $ClusterEnabled): string
     {
         if (!$this->IsValidCoordinate()) {
             return "console.log('Skipping invalid coordinates for marker {$this->ID}');\n";
         }
         
         $rendered = "";
-        $coords = "[{$this->GetLongitude()}, {$this->GetLatitude()}]";
+        $coords = sprintf('[%s, %s]', $this->GetLongitude(), $this->GetLatitude());
         
         $rendered .= "
-        var marker{$this->ID}Coords = ol.proj.fromLonLat($coords);
+        var marker{$this->ID}Coords = ol.proj.fromLonLat({$coords});
         var marker{$this->ID}Feature = new ol.Feature({
             geometry: new ol.geom.Point(marker{$this->ID}Coords),
             markerId: '{$this->ID}'";
@@ -74,7 +78,8 @@ class OpenLayersMarker
         } elseif ($this->Base64Icon) {
             $rendered .= ",\n            iconUrl: '{$this->Base64Icon}'";
         } elseif ($this->IconVariable) {
-            $rendered .= ",\n            iconUrl: {$this->IconVariable}";
+            $rendered .= ',
+            iconUrl: ' . $this->IconVariable;
         }
         
         // Add popup content if InfoBox exists
@@ -123,21 +128,23 @@ class OpenLayersMarker
     }
     
     // Keep the original Render method for backward compatibility
-    public function Render($mapVariable, $ClusterEnabled)
+    public function Render($mapVariable, $ClusterEnabled): string
     {
         return $this->RenderOpenLayers($mapVariable, $ClusterEnabled);
     }
     
-    public function GetReactData($iconPath = "")
+    public function GetReactData($iconPath = ""): ?array
     {
         if (!$this->IsValidCoordinate()) {
             return null;
         }
+        
         $icon = $this->IconPath;
         if($icon == "")
         {
             $icon = $iconPath;
         }
+        
         $data = [
             "key" => $this->ID,
             "icon" => $icon,
@@ -147,6 +154,7 @@ class OpenLayersMarker
         {
             $data["infobox"] = $this->InfoBox->GetReactData();
         }
+        
         return $data;
     }
 }

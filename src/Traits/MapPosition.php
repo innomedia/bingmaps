@@ -1,7 +1,6 @@
 <?php
 namespace bingMap;
 
-use SilverStripe\Dev\Debug;
 spl_autoload_register();
 
 trait MapPosition
@@ -13,41 +12,50 @@ trait MapPosition
         $this->Coords = $coords;
         return $this;
     }
+    
     public function GetPosition()
     {
         return $this->Coords;
     }
+    
     public function GetLatitude()
     {
         return $this->Coords->GetLatitude();
     }
+    
     public function GetLongitude()
     {
         return $this->Coords->GetLongitude();
     }
-    public function GetLocationVariable($ID,$Suffix)
+    
+    public function GetLocationVariable($ID,string $Suffix): string
     {
-        return "Location_{$Suffix}_{$ID}";
+        return sprintf('Location_%s_%s', $Suffix, $ID);
     }
-    public function HasPosition()
+    
+    public function HasPosition(): bool
     {
         return $this->Coords != null;
     }
+    
     //Might Rename to IsValidCoordinate could cause misunderstanding
     public function IsValidCoordinate()
     {
         return $this->Coords->IsValid();
     }
-    public function RenderLocationVariable($ID,$Suffix)
+    
+    public function RenderLocationVariable($ID,string $Suffix): string
     {
-        return "var Location_{$Suffix}_{$ID} = [{$this->GetLongitude()}, {$this->GetLatitude()}]; ";
+        return sprintf('var Location_%s_%s = [%s, %s]; ', $Suffix, $ID, $this->GetLongitude(), $this->GetLatitude());
     }
-    public function RenderLocation()
+    
+    public function RenderLocation(): string
     {
         if($this->HasPosition())
         {
-            return "[{$this->GetLongitude()}, {$this->GetLatitude()}]";
+            return sprintf('[%s, %s]', $this->GetLongitude(), $this->GetLatitude());
         }
+        
         return "";
     } 
 }
