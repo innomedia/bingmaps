@@ -1,9 +1,10 @@
 <?php
 namespace bingMap;
 
+use SilverStripe\ORM\FieldType\DBHTMLText;
+use SilverStripe\Model\ModelData;
 use bingMap\MapPosition;
 use SilverStripe\Dev\Debug;
-use SilverStripe\View\ViewableData;
 use SilverStripe\SiteConfig\SiteConfig;
 
 /**
@@ -32,50 +33,86 @@ use SilverStripe\SiteConfig\SiteConfig;
  *     ->HideZoomButtons();
  * echo $map->XML_val("");
  */
-class Map extends ViewableData
+class Map extends ModelData
 {
     use MapPosition;
 
     private $Debug = true;
+    
     private $ID;
+    
     private $Style;
+    
     private $Height = 500;
+    
     private $Width = 500;
+    
     private $loadOnStartClass;
+    
     private $IconPath = null;
+    
     private $Base64Icon = null;
+    
     private $CenterOnPins = true;
+    
     private $Padding = 50;
-    private $Markers = [];
+    
+    private array $Markers = [];
+    
     private $ScriptSettings = [];
+    
     private $Zoom = null;
-    private $MouseWheelZoom = null;
+    
+    private ?bool $MouseWheelZoom = null;
+    
     private $MapType = null;
+    
     private $ClusterLayer = false;
+    
     private $SpatialDataService = false;
+    
     private $SpatialDataServiceType = "PopulatedPlace";
+    
     private $SpatialDataServicePostalCodes = null;
+    
     private $PolygoneData = [];
     
     // Cluster customization properties
-    private $ClusterColors = ['#51bbd6', '#f1f075', '#f28cb1', '#e55e5e']; // Default cluster colors
-    private $ClusterColorSteps = [10, 50, 100]; // Point count thresholds for color changes
+    private $ClusterColors = ['#51bbd6', '#f1f075', '#f28cb1', '#e55e5e'];
+
+     // Default cluster colors
+    private $ClusterColorSteps = [10, 50, 100];
+
+     // Point count thresholds for color changes
     private $ClusterStrokeColor = 'white';
+    
     private $ClusterStrokeWidth = 2;
     
     // Additional Azure Maps specific options
-    private $DisablePanning = false;
-    private $DisableZooming = false;
-    private $DisableRotation = false;
-    private $DisablePitching = false;
-    private $ShowZoomButtons = true;
-    private $ShowCompass = true;
-    private $ShowPitchToggle = true;
-    private $ShowStylePicker = true;
-    private $ShowFullscreenControl = false;
+    private bool $DisablePanning = false;
+    
+    private bool $DisableZooming = false;
+    
+    private bool $DisableRotation = false;
+    
+    private bool $DisablePitching = false;
+    
+    private bool $ShowZoomButtons = true;
+    
+    private bool $ShowCompass = true;
+    
+    private bool $ShowPitchToggle = true;
+    
+    private bool $ShowStylePicker = true;
+    
+    private bool $ShowFullscreenControl = false;
+    
     private $ZoomButtonsPosition = "top-right";
+    
     private $CompassPosition = "bottom-right";
+    
     private $MarkerAnchor = "bottom";
+    
     private $IsUserCentrics = false;
 
     /*
@@ -98,9 +135,9 @@ class Map extends ViewableData
         $this->ID = $ID;
     }
     
-    public static function createMap($ID = "1", $loadOnStartClass = "", $Debug = false)
+    public static function createMap($ID = "1", $loadOnStartClass = "", $Debug = false): Map
     {
-        return new Map($ID, $loadOnStartClass, $Debug);
+        return Map::create($ID, $loadOnStartClass, $Debug);
     }
     
     /**
@@ -109,54 +146,64 @@ class Map extends ViewableData
      * @param string $type The console method type (console.log, console.warn, console.error)
      * @return string JavaScript console statement or empty string
      */
-    private function debugLog($message, $type = "console.log")
+    private function debugLog(string $message, string $type = "console.log"): string
     {
         if ($this->Debug) {
             return "{$type}('{$message}');\n";
         }
+        
         return "";
     }
-    public function SetIsUserCentrics($value)
+    
+    public function SetIsUserCentrics($value): static
     {
         $this->IsUserCentrics = $value;
         return $this;
     }
-    public function SetCenterOnPins($value)
+    
+    public function SetCenterOnPins($value): static
     {
         $this->CenterOnPins = $value;
         return $this;
     }
-    public function setClusterLayer($value)
+    
+    public function setClusterLayer($value): static
     {
         $this->ClusterLayer = $value;
         return $this;
     }
-    public function setSpatialDataService($value)
+    
+    public function setSpatialDataService($value): static
     {
         $this->SpatialDataService = $value;
         return $this;
     }
-    public function addScriptSetting($key,$value)
+    
+    public function addScriptSetting($key,$value): static
     {
         $this->ScriptSettings[$key] = $value; 
         return $this;
     }
-    public function removeScriptSetting($key)
+    
+    public function removeScriptSetting($key): static
     {
         unset($this->ScriptSettings[$key]);
         return $this;
     }
-    public function setSpatialDataServiceType($value)
+    
+    public function setSpatialDataServiceType($value): static
     {
         $this->SpatialDataServiceType = $value;
         return $this;
     }
-    public function setSpatialDataServicePostalCodes($value)
+    
+    public function setSpatialDataServicePostalCodes($value): static
     {
         $this->SpatialDataServicePostalCodes = $value;
         return $this;
     }
-    public function setPolygoneData($value)
+    
+    public function setPolygoneData($value): static
     {
         $this->PolygoneData = $value;
         return $this;
@@ -167,7 +214,7 @@ class Map extends ViewableData
      * @param array $colors Array of color values for different cluster sizes
      * @return $this
      */
-    public function SetClusterColors($colors)
+    public function SetClusterColors($colors): static
     {
         $this->ClusterColors = $colors;
         return $this;
@@ -178,7 +225,7 @@ class Map extends ViewableData
      * @param array $steps Array of point count thresholds (e.g., [10, 50, 100])
      * @return $this
      */
-    public function SetClusterColorSteps($steps)
+    public function SetClusterColorSteps($steps): static
     {
         $this->ClusterColorSteps = $steps;
         return $this;
@@ -189,7 +236,7 @@ class Map extends ViewableData
      * @param string $color Color value (e.g., 'white', '#ffffff', 'rgb(255,255,255)')
      * @return $this
      */
-    public function SetClusterStrokeColor($color)
+    public function SetClusterStrokeColor($color): static
     {
         $this->ClusterStrokeColor = $color;
         return $this;
@@ -200,18 +247,19 @@ class Map extends ViewableData
      * @param int $width Width in pixels
      * @return $this
      */
-    public function SetClusterStrokeWidth($width)
+    public function SetClusterStrokeWidth($width): static
     {
         $this->ClusterStrokeWidth = $width;
         return $this;
     }
     
-    public function SetZoom($value)
+    public function SetZoom($value): static
     {
         $this->Zoom = $value;
         return $this;
     }
-    public function DisableMouseWheelZoom()
+    
+    public function DisableMouseWheelZoom(): void
     {
         $this->MouseWheelZoom = true;
     }
@@ -219,7 +267,7 @@ class Map extends ViewableData
     /**
      * Disable panning (dragging) on the map
      */
-    public function DisablePanning()
+    public function DisablePanning(): static
     {
         $this->DisablePanning = true;
         return $this;
@@ -228,7 +276,7 @@ class Map extends ViewableData
     /**
      * Disable zooming functionality (both scroll wheel and zoom buttons)
      */
-    public function DisableZooming()
+    public function DisableZooming(): static
     {
         $this->DisableZooming = true;
         return $this;
@@ -237,7 +285,7 @@ class Map extends ViewableData
     /**
      * Disable map rotation
      */
-    public function DisableRotation()
+    public function DisableRotation(): static
     {
         $this->DisableRotation = true;
         return $this;
@@ -246,7 +294,7 @@ class Map extends ViewableData
     /**
      * Disable map pitching (3D tilt)
      */
-    public function DisablePitching()
+    public function DisablePitching(): static
     {
         $this->DisablePitching = true;
         return $this;
@@ -255,7 +303,7 @@ class Map extends ViewableData
     /**
      * Hide zoom control buttons
      */
-    public function HideZoomButtons()
+    public function HideZoomButtons(): static
     {
         $this->ShowZoomButtons = false;
         return $this;
@@ -264,7 +312,7 @@ class Map extends ViewableData
     /**
      * Hide compass control
      */
-    public function HideCompass()
+    public function HideCompass(): static
     {
         $this->ShowCompass = false;
         return $this;
@@ -273,7 +321,7 @@ class Map extends ViewableData
     /**
      * Hide pitch toggle control
      */
-    public function HidePitchToggle()
+    public function HidePitchToggle(): static
     {
         $this->ShowPitchToggle = false;
         return $this;
@@ -282,7 +330,7 @@ class Map extends ViewableData
     /**
      * Hide style picker control
      */
-    public function HideStylePicker()
+    public function HideStylePicker(): static
     {
         $this->ShowStylePicker = false;
         return $this;
@@ -291,7 +339,7 @@ class Map extends ViewableData
     /**
      * Enable fullscreen control
      */
-    public function ShowFullscreenControl()
+    public function ShowFullscreenControl(): static
     {
         $this->ShowFullscreenControl = true;
         return $this;
@@ -301,7 +349,7 @@ class Map extends ViewableData
      * Set position for zoom buttons control
      * @param string $position Position for zoom control ('top-left', 'top-right', 'bottom-left', 'bottom-right')
      */
-    public function SetZoomButtonsPosition($position)
+    public function SetZoomButtonsPosition($position): static
     {
         $this->ZoomButtonsPosition = $position;
         return $this;
@@ -311,7 +359,7 @@ class Map extends ViewableData
      * Set position for compass control
      * @param string $position Position for compass control ('top-left', 'top-right', 'bottom-left', 'bottom-right')
      */
-    public function SetCompassPosition($position)
+    public function SetCompassPosition($position): static
     {
         $this->CompassPosition = $position;
         return $this;
@@ -321,74 +369,88 @@ class Map extends ViewableData
      * Set marker icon anchor position
      * @param string $anchor Anchor position ('center', 'top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right')
      */
-    public function SetMarkerAnchor($anchor)
+    public function SetMarkerAnchor($anchor): static
     {
         $this->MarkerAnchor = $anchor;
         return $this;
     }
-    public function SetIcon($IconPath)
+    
+    public function SetIcon($IconPath): static
     {
         $this->IconPath = $IconPath;
         return $this;
     }
-    public function SetCenterOnPinsPadding($value)
+    
+    public function SetCenterOnPinsPadding($value): static
     {
         $this->Padding = $value;
         return $this;
     }
-    public function SetBase64Icon($Base64)
+    
+    public function SetBase64Icon($Base64): static
     {
         $this->Base64Icon = $Base64;
         return $this;
     }
-    public function SetStyle($style)
+    
+    public function SetStyle($style): static
     {
         $this->Style = $style;
         return $this;
     }
-    public function SetHeight($pixel)
+    
+    public function SetHeight($pixel): static
     {
         $this->Height = $pixel;
         return $this;
     }
-    public function SetWidth($pixel)
+    
+    public function SetWidth($pixel): static
     {
         $this->Width = $pixel;
         return $this;
     }
+    
     //When Bing adds new Types not covered by Set[Type]Type Methods
-    public function SetMapType($Type)
+    public function SetMapType($Type): static
     {
         $this->MapType = $Type;
         return $this;
     }
-    public function SetDarkMapType()
+    
+    public function SetDarkMapType(): static
     {
         return $this->SetMapType("'grayscale_dark'");
     }
+    
     //Default when nothing is set
-    public function SetLightMapType()
+    public function SetLightMapType(): static
     {
         return $this->SetMapType("'road'");
     }
-    public function SetGrayscaleMapType()
+    
+    public function SetGrayscaleMapType(): static
     {
         return $this->SetMapType("'grayscale_light'");
     }
-    public function HasLoadOnStartClass()
+    
+    public function HasLoadOnStartClass(): bool
     {
         return $this->loadOnStartClass != "";
     }
-    public function AddMarker($marker)
+    
+    public function AddMarker($marker): void
     {
-        array_push($this->Markers, $marker);
+        $this->Markers[] = $marker;
     }
-    public function XML_val($field, $arguments = [], $cache = false)
+
+    public function forTemplate(): string
     {
         $data = $this->getData();
         return $this->customise($data)->renderWith("bingMap");
     }
-    private function getData()
+    
+    private function getData(): array
     {
         return [
             "Script" => $this->RenderFunction(),
@@ -397,15 +459,18 @@ class Map extends ViewableData
             "IsUserCentrics" => $this->IsUserCentrics
         ];
     }
+    
     public function GetLoadOnStartClass()
     {
         return $this->loadOnStartClass;
     }
-    public static function GetIconVariable()
+    
+    public static function GetIconVariable(): string
     {
         return "Icon";
     }
-    private function RenderMarkers($mapVariable)
+    
+    private function RenderMarkers(string $mapVariable): string
     {
         $rendered = "";
         $rendered .= $this->debugLog("Rendering " . count($this->Markers) . " markers...");
@@ -415,20 +480,23 @@ class Map extends ViewableData
         }
         
         // Create datasource and layer for non-clustered markers
-        if ($this->ClusterLayer == false && count($this->Markers) > 0) {
+        if ($this->ClusterLayer == false && $this->Markers !== []) {
             $rendered .= $this->debugLog("Creating dataSource for non-clustered markers...");
             $rendered .= "var dataSource = new atlas.source.DataSource();\n";
-            $rendered .= "{$mapVariable}.sources.add(dataSource);\n";
+            $rendered .= $mapVariable . '.sources.add(dataSource);
+';
             $rendered .= $this->debugLog("DataSource added to map");
             
             // Collect all unique custom icons that need to be loaded
             $customIcons = [];
-            for ($i = 0; $i < count($this->Markers); $i++) {
+            $counter = count($this->Markers);
+            for ($i = 0; $i < $counter; ++$i) {
                 $marker = $this->Markers[$i];
                 $iconPath = $marker->GetIconPath();
                 if ($iconPath != null && !in_array($iconPath, $customIcons)) {
                     $customIcons[] = $iconPath;
                 }
+                
                 $base64Icon = $marker->GetBase64Icon();
                 if ($base64Icon != null && !in_array($base64Icon, $customIcons)) {
                     $customIcons[] = $base64Icon;
@@ -440,7 +508,7 @@ class Map extends ViewableData
                 $customIcons[] = $this->IconPath;
             }
             
-            if (!empty($customIcons)) {
+            if ($customIcons !== []) {
                 $rendered .= $this->debugLog("Loading custom icons...");
                 $rendered .= "var iconsToLoad = " . json_encode($customIcons) . ";\n";
                 $rendered .= "var loadedIcons = 0;\n";
@@ -459,6 +527,7 @@ class Map extends ViewableData
                 } else {
                     $rendered .= "                    'pin-red'\n";
                 }
+                
                 $rendered .= "                ],\n";
                 $rendered .= "                anchor: '{$this->MarkerAnchor}',\n";
                 $rendered .= "                allowOverlap: true,\n";
@@ -489,12 +558,12 @@ class Map extends ViewableData
                 // Load each custom icon
                 foreach ($customIcons as $iconPath) {
                     $iconId = 'icon-' . md5($iconPath);
-                    $rendered .= "{$mapVariable}.imageSprite.add('$iconId', '$iconPath').then(function() {\n";
-                    $rendered .= "    " . ($this->Debug ? "console.log('Loaded custom icon: $iconPath');\n" : "") . "";
+                    $rendered .= "{$mapVariable}.imageSprite.add('{$iconId}', '{$iconPath}').then(function() {\n";
+                    $rendered .= "    " . ($this->Debug ? "console.log('Loaded custom icon: {$iconPath}');\n" : "") . "";
                     $rendered .= "    loadedIcons++;\n";
                     $rendered .= "    createSymbolLayerAfterIconsLoaded();\n";
                     $rendered .= "}, function(error) {\n";
-                    $rendered .= "    console.error('Failed to load custom icon $iconPath:', error);\n";
+                    $rendered .= "    console.error('Failed to load custom icon {$iconPath}:', error);\n";
                     $rendered .= "    loadedIcons++;\n";
                     $rendered .= "    createSymbolLayerAfterIconsLoaded();\n";
                     $rendered .= "});\n";
@@ -514,11 +583,13 @@ class Map extends ViewableData
                 $rendered .= "        offset: [0, -2]\n";
                 $rendered .= "    }\n";
                 $rendered .= "};\n";
-                $rendered .= "{$mapVariable}.layers.add(symbolLayer);\n";
+                $rendered .= $mapVariable . '.layers.add(symbolLayer);
+';
                 $rendered .= $this->debugLog("SymbolLayer added to map");
                 
                 // Add click event handler
-                $rendered .= "{$mapVariable}.events.add('click', symbolLayer, function(e) {\n";
+                $rendered .= $mapVariable . '.events.add(\'click\', symbolLayer, function(e) {
+';
                 $rendered .= "    if (e.shapes && e.shapes.length > 0) {\n";
                 $rendered .= "        var shape = e.shapes[0];\n";
                 $rendered .= "        var properties = shape.getProperties();\n";
@@ -530,8 +601,10 @@ class Map extends ViewableData
                 $rendered .= $this->debugLog("Click event handler added for markers");
             }
         }
+
+        $counter = count($this->Markers);
         
-        for ($i = 0; $i < count($this->Markers); $i++) {
+        for ($i = 0; $i < $counter; ++$i) {
             if($this->ClusterLayer == false)
             {
                 $rendered .= $this->debugLog("Adding marker " . ($i + 1) . "...");
@@ -541,45 +614,54 @@ class Map extends ViewableData
             // Always add locations for centering, regardless of cluster mode
             if ($this->CenterOnPins == true) {
                 $loc = $this->Markers[$i]->RenderLocation();
-                $rendered .= "locs.push($loc);\n";
+                $rendered .= "locs.push({$loc});\n";
             }
         }
+        
         $rendered .= $this->debugLog("Markers rendering complete.");
         return $rendered;
     }
-    private function RenderInfoBoxCloser()
+    
+    private function RenderInfoBoxCloser(): string
     {
         $rendered = "";
-        for ($i = 0; $i < count($this->Markers); $i++) {
+        $counter = count($this->Markers);
+        for ($i = 0; $i < $counter; ++$i) {
             $rendered .= "function closePopup{$i}(){\n";
-            $rendered .= "    if(InfoBoxCollection[$i]) InfoBoxCollection[$i].close();\n";
+            $rendered .= "    if(InfoBoxCollection[{$i}]) InfoBoxCollection[{$i}].close();\n";
             $rendered .= "}\n";
         }
+        
         return $rendered;
     }
-    private function RenderMapCenteringOnPins($mapVariable)
+    
+    private function RenderMapCenteringOnPins(string $mapVariable): string
     {
-        if ($this->CenterOnPins == true && count($this->Markers) > 0) {
+        if ($this->CenterOnPins == true && $this->Markers !== []) {
             return "{$mapVariable}.setCamera({\n
                 bounds: atlas.data.BoundingBox.fromPositions(locs),\n
                 padding: $this->Padding\n
             });\n";
         }
+        
         return "";
     }
-    private function RenderClusterLayer($mapVariable)
+    
+    private function RenderClusterLayer(string $mapVariable): string
     {
         if ($this->ClusterLayer == true) {
             $rendered = "";
             
             // Collect all unique custom icons that need to be loaded for clustering
             $customIcons = [];
-            for ($i = 0; $i < count($this->Markers); $i++) {
+            $counter = count($this->Markers);
+            for ($i = 0; $i < $counter; ++$i) {
                 $marker = $this->Markers[$i];
                 $iconPath = $marker->GetIconPath();
                 if ($iconPath != null && !in_array($iconPath, $customIcons)) {
                     $customIcons[] = $iconPath;
                 }
+                
                 $base64Icon = $marker->GetBase64Icon();
                 if ($base64Icon != null && !in_array($base64Icon, $customIcons)) {
                     $customIcons[] = $base64Icon;
@@ -600,26 +682,27 @@ class Map extends ViewableData
                     'popupContent': [['get', 'popupContent'], ['literal', '']]
                 }
             });\n";
-            $rendered .= "{$mapVariable}.sources.add(clusterDataSource);\n";
+            $rendered .= $mapVariable . '.sources.add(clusterDataSource);
+';
             
             // Add markers to the data source
             $rendered .= "var clusterPoints = [];\n";
-            for ($i = 0; $i < count($this->Markers); $i++) {
+            $counter = count($this->Markers);
+            for ($i = 0; $i < $counter; ++$i) {
                 $output = $this->Markers[$i]->RenderClusterMarker($mapVariable, true);
                 $rendered .= $output["rendered"];
                 $loc = $output["pushpinvariable"];
-                $rendered .= "clusterPoints.push($loc);\n";
+                $rendered .= "clusterPoints.push({$loc});\n";
             }
             
             $rendered .= "clusterDataSource.add(clusterPoints);\n";
-            if ($this->Debug) {
-            if ($this->Debug) {
-                $rendered .= "console.log('Added ' + clusterPoints.length + ' points to cluster data source');\n";
-            }
+            if ($this->Debug && $this->Debug) {
+            $rendered .= "console.log('Added ' + clusterPoints.length + ' points to cluster data source');\n";
             }
             
             // Create bubble layer for clusters with dynamic sizing
-            $rendered .= "{$mapVariable}.layers.add(new atlas.layer.BubbleLayer(clusterDataSource, null, {\n";
+            $rendered .= $mapVariable . '.layers.add(new atlas.layer.BubbleLayer(clusterDataSource, null, {
+';
             $rendered .= "                radius: [\n";
             $rendered .= "                    'step',\n";
             $rendered .= "                    ['get', 'point_count'],\n";
@@ -636,22 +719,23 @@ class Map extends ViewableData
             $rendered .= $this->debugLog("Bubble layer added for clusters");
             
             // Create symbol layer for cluster count labels
-            $rendered .= "{$mapVariable}.layers.add(new atlas.layer.SymbolLayer(clusterDataSource, null, {
+            $rendered .= $mapVariable . '.layers.add(new atlas.layer.SymbolLayer(clusterDataSource, null, {
                 iconOptions: {
-                    image: 'none'
+                    image: \'none\'
                 },
                 textOptions: {
-                    textField: ['get', 'point_count_abbreviated'],
+                    textField: [\'get\', \'point_count_abbreviated\'],
                     offset: [0, 0.4],
-                    color: 'white',
-                    font: ['StandardFont-Bold'],
+                    color: \'white\',
+                    font: [\'StandardFont-Bold\'],
                     size: 12
                 },
-                filter: ['has', 'point_count']
-            }));\n";
+                filter: [\'has\', \'point_count\']
+            }));
+';
             $rendered .= $this->debugLog("Symbol layer added for cluster counts");
             
-            if (!empty($customIcons)) {
+            if ($customIcons !== []) {
                 $rendered .= $this->debugLog("Loading custom icons for clustering...");
                 $rendered .= "var clusterIconsToLoad = " . json_encode($customIcons) . ";\n";
                 $rendered .= "var clusterLoadedIcons = 0;\n";
@@ -670,10 +754,11 @@ class Map extends ViewableData
                 $rendered .= "                    ['has', 'iconUrl'], ['get', 'iconUrl'],\n";
                 if ($this->IconPath != null) {
                     $iconId = 'icon-' . md5($this->IconPath);
-                    $rendered .= "                    '$iconId'\n";
+                    $rendered .= "                    '{$iconId}'\n";
                 } else {
                     $rendered .= "                    'pin-red'\n";
                 }
+                
                 $rendered .= "                ],\n";
                 $rendered .= "                size: 1.0,\n";
                 $rendered .= "                anchor: '{$this->MarkerAnchor}'\n";
@@ -689,12 +774,12 @@ class Map extends ViewableData
                 // Load each custom icon
                 foreach ($customIcons as $iconPath) {
                     $iconId = 'icon-' . md5($iconPath);
-                    $rendered .= "{$mapVariable}.imageSprite.add('$iconId', '$iconPath').then(function() {\n";
-                    $rendered .= "    " . ($this->Debug ? "console.log('Loaded cluster icon: $iconPath');\n" : "") . "";
+                    $rendered .= "{$mapVariable}.imageSprite.add('{$iconId}', '{$iconPath}').then(function() {\n";
+                    $rendered .= "    " . ($this->Debug ? "console.log('Loaded cluster icon: {$iconPath}');\n" : "") . "";
                     $rendered .= "    clusterLoadedIcons++;\n";
                     $rendered .= "    createUnclusteredLayerAfterIconsLoaded();\n";
                     $rendered .= "}, function(error) {\n";
-                    $rendered .= "    console.error('Failed to load cluster icon $iconPath:', error);\n";
+                    $rendered .= "    console.error('Failed to load cluster icon {$iconPath}:', error);\n";
                     $rendered .= "    clusterLoadedIcons++;\n";
                     $rendered .= "    createUnclusteredLayerAfterIconsLoaded();\n";
                     $rendered .= "});\n";
@@ -709,12 +794,14 @@ class Map extends ViewableData
                 $rendered .= "        anchor: '{$this->MarkerAnchor}'\n";
                 $rendered .= "    }\n";
                 $rendered .= "});\n";
-                $rendered .= "{$mapVariable}.layers.add(unclusteredLayer);\n";
+                $rendered .= $mapVariable . '.layers.add(unclusteredLayer);
+';
                 $rendered .= $this->debugLog("Symbol layer added for individual points with default icon");
             }
             
             // Add click event for clusters to zoom in and individual markers to show popups
-            $rendered .= "{$mapVariable}.events.add('click', clusterDataSource, function(e) {\n";
+            $rendered .= $mapVariable . '.events.add(\'click\', clusterDataSource, function(e) {
+';
             $rendered .= "    if (e.shapes && e.shapes.length > 0) {\n";
             $rendered .= "        var properties = e.shapes[0].getProperties();\n";
             $rendered .= "        " . ($this->Debug ? "console.log('Cluster click event - properties:', properties);\n" : "") . "";
@@ -738,7 +825,7 @@ class Map extends ViewableData
             $rendered .= "});\n";
             
             // Also add click event specifically to the unclustered layer for better reliability
-            if (!empty($customIcons)) {
+            if ($customIcons !== []) {
                 $rendered .= "// Add click event to unclustered layer after icons are loaded\n";
                 $rendered .= "function addUnclusteredClickEvents() {\n";
                 $rendered .= "    var unclusteredLayer = {$mapVariable}.layers.getLayerById('unclustered-points');\n";
@@ -779,12 +866,14 @@ class Map extends ViewableData
             }
             
             // Add mouse enter event to change cursor
-            $rendered .= "{$mapVariable}.events.add('mouseenter', clusterDataSource, function() {\n";
+            $rendered .= $mapVariable . '.events.add(\'mouseenter\', clusterDataSource, function() {
+';
             $rendered .= "    {$mapVariable}.getCanvasContainer().style.cursor = 'pointer';\n";
             $rendered .= "});\n";
             
             // Add mouse leave event to reset cursor
-            $rendered .= "{$mapVariable}.events.add('mouseleave', clusterDataSource, function() {\n";
+            $rendered .= $mapVariable . '.events.add(\'mouseleave\', clusterDataSource, function() {
+';
             $rendered .= "    {$mapVariable}.getCanvasContainer().style.cursor = 'grab';\n";
             $rendered .= "});\n";
             
@@ -792,9 +881,11 @@ class Map extends ViewableData
             
             return $rendered;
         }
+        
         return "";
     }
-    private function RenderPolygones($mapVariable){
+    
+    private function RenderPolygones(string $mapVariable): string{
         if($this->PolygoneData && $this->PolygoneData !== '' && count($this->PolygoneData) > 0){
             $rendered = "";
             
@@ -804,24 +895,26 @@ class Map extends ViewableData
             
             // Create a single datasource for all custom polygons
             $rendered .= "var polygonDataSource = new atlas.source.DataSource('polygon-data-source');\n";
-            $rendered .= "{$mapVariable}.sources.add(polygonDataSource);\n";
+            $rendered .= $mapVariable . '.sources.add(polygonDataSource);
+';
             
             // Collect all polygon features
             $rendered .= "var polygonFeatures = [];\n";
+            $counter = count($this->PolygoneData);
             
-            for ($i = 0; $i < count($this->PolygoneData); $i++){
+            for ($i = 0; $i < $counter; ++$i){
                 if($this->PolygoneData[$i] !== ''){
                     $rendered .= "
                     // Polygon {$i}
                     var exteriorRing{$i} = [";
                         
                         $coordCount = 0;
-                        for ($j = 0; $j < count($this->PolygoneData[$i]['Coords']); $j++){
+                        for ($j = 0; $j < count($this->PolygoneData[$i]['Coords']); ++$j){
                             if($this->PolygoneData[$i]['Coords'][$j] &&
                                 $this->PolygoneData[$i]['Coords'][$j] !== '' &&
                                 $this->PolygoneData[$i]['Coords'][$j]->IsValid()){
-                                $rendered .= "[{$this->PolygoneData[$i]['Coords'][$j]->GetLongitude()}, {$this->PolygoneData[$i]['Coords'][$j]->GetLatitude()}],";
-                                $coordCount++;
+                                $rendered .= sprintf('[%s, %s],', $this->PolygoneData[$i]['Coords'][$j]->GetLongitude(), $this->PolygoneData[$i]['Coords'][$j]->GetLatitude());
+                                ++$coordCount;
                             }
                         }
                         
@@ -879,15 +972,16 @@ class Map extends ViewableData
             
             return $rendered;
         }
+        
         return "";
     }
 
-      private function RenderSpatialDataService($mapVariable)
+      private function RenderSpatialDataService(string $mapVariable): string
     {
         if ($this->SpatialDataService == true) {
             
             // Fetch polygon data for markers and add to PolygoneData for rendering
-            if (!empty($this->Markers)) {
+            if ($this->Markers !== []) {
                 error_log("Fetching spatial polygons for " . count($this->Markers) . " markers (caching enabled)");
                 
                 // Initialize PolygoneData if not set
@@ -897,29 +991,30 @@ class Map extends ViewableData
                 
                 $cacheHits = 0;
                 $cacheMisses = 0;
+                $counter = count($this->Markers);
                 
-                for ($i = 0; $i < count($this->Markers); $i++) {
+                for ($i = 0; $i < $counter; ++$i) {
                     $marker = $this->Markers[$i];
                     if ($marker->HasPosition()) {
                         $latitude = $marker->GetLatitude();
                         $longitude = $marker->GetLongitude();
                         
-                        error_log("Processing polygon for marker $i at coordinates: $latitude, $longitude");
+                        error_log(sprintf('Processing polygon for marker %d at coordinates: %s, %s', $i, $latitude, $longitude));
                         
                         // Try to get polygon data from cache first
                         $polygonResult = null;
                         $cachedData = $this->getPolygonFromCache($latitude, $longitude);
                         if ($cachedData && isset($cachedData['data'])) {
                             $polygonResult = $cachedData['data'];
-                            $cacheHits++;
-                            error_log("Using cached polygon data for marker $i");
+                            ++$cacheHits;
+                            error_log('Using cached polygon data for marker ' . $i);
                         } else {
-                            $cacheMisses++;
+                            ++$cacheMisses;
                         }
                         
                         // If no cache hit, fetch from API
                         if (!$polygonResult) {
-                            error_log("Fetching polygon from API for marker $i at coordinates: $latitude, $longitude");
+                            error_log(sprintf('Fetching polygon from API for marker %d at coordinates: %s, %s', $i, $latitude, $longitude));
                             $polygonResult = $this->getPolygonForCoordinate($latitude, $longitude);
                             // Cache the result if successful
                             if ($polygonResult) {
@@ -946,7 +1041,9 @@ class Map extends ViewableData
                             foreach ($polygonResult['coordinates'] as $coord) {
                                 // Create a simple coordinate object that implements the required methods
                                 $coordObj = new class($coord['lat'], $coord['lng']) {
-                                    private $lat, $lng;
+                                    private $lat;
+
+                                    private $lng;
                                     
                                     public function __construct($lat, $lng) {
                                         $this->lat = $lat;
@@ -954,8 +1051,10 @@ class Map extends ViewableData
                                     }
                                     
                                     public function GetLatitude() { return $this->lat; }
+                                    
                                     public function GetLongitude() { return $this->lng; }
-                                    public function IsValid() { return !empty($this->lat) && !empty($this->lng); }
+                                    
+                                    public function IsValid(): bool { return !empty($this->lat) && !empty($this->lng); }
                                 };
                                 
                                 $polygonForMap['Coords'][] = $coordObj;
@@ -970,15 +1069,15 @@ class Map extends ViewableData
                                 error_log("Spatial polygon added - Level: " . $polygonResult['level'] . ", Entity: " . $polygonResult['entityType'] . ", Points: " . count($polygonResult['coordinates']));
                             }
                         } else {
-                            error_log("No polygon found for marker $i at coordinates: $latitude, $longitude");
+                            error_log(sprintf('No polygon found for marker %d at coordinates: %s, %s', $i, $latitude, $longitude));
                         }
                     } else {
-                        error_log("Marker $i has no valid position");
+                        error_log(sprintf('Marker %d has no valid position', $i));
                     }
                 }
                 
                 error_log("Spatial data service processing complete. Total polygons in PolygoneData: " . count($this->PolygoneData));
-                error_log("Cache performance - Hits: $cacheHits, Misses: $cacheMisses, Hit Rate: " . 
+                error_log(sprintf('Cache performance - Hits: %d, Misses: %d, Hit Rate: ', $cacheHits, $cacheMisses) . 
                          ($cacheHits + $cacheMisses > 0 ? round(($cacheHits / ($cacheHits + $cacheMisses)) * 100, 1) : 0) . "%");
             } else {
                 error_log("No markers found for spatial data service");
@@ -987,27 +1086,31 @@ class Map extends ViewableData
             // Return empty string as polygons will be rendered by RenderPolygones
             return "";
         }
+        
         return "";
     }
     
-    private function RenderIcon()
+    private function RenderIcon(): string
     {
         if ($this->IconPath != null) {
             $iconvariable = Self::GetIconVariable();
-            return "var $iconvariable = '$this->IconPath';";
+            return sprintf("var %s = '%s';", $iconvariable, $this->IconPath);
         }
+        
         if ($this->Base64Icon != null) {
             $iconvariable = Self::GetIconVariable();
-            return "var $iconvariable = '$this->Base64Icon';";
+            return sprintf("var %s = '%s';", $iconvariable, $this->Base64Icon);
         }
+        
         return "";
     }
 
-    public function RenderZoom()
+    public function RenderZoom(): string
     {
         if ($this->Zoom != null) {
             return ",\n                zoom: " . $this->Zoom;
         }
+        
         return "";
     }
     
@@ -1016,19 +1119,22 @@ class Map extends ViewableData
         if ($this->Zoom != null) {
             return $this->Zoom;
         }
+        
         return 10;
     }
-    public function RenderMapTypeID()
+    
+    public function RenderMapTypeID(): string
     {
         if($this->MapType != null && $this->MapType != "")
         {
             return ",\n                style: ".$this->MapType;
         }
+        
         return "";
         
     }
 
-    public function RenderOptions($mapVariable)
+    public function RenderOptions(string $mapVariable): string
     {
         $script = "";
         
@@ -1061,12 +1167,14 @@ class Map extends ViewableData
         }
         
         // Apply user interaction options if any are set
-        if (!empty($userInteractionOptions)) {
-            $script .= "{$mapVariable}.setUserInteraction({\n";
+        if ($userInteractionOptions !== []) {
+            $script .= $mapVariable . '.setUserInteraction({
+';
             $optionPairs = [];
             foreach ($userInteractionOptions as $key => $value) {
-                $optionPairs[] = "    {$key}: " . ($value ? 'true' : 'false');
+                $optionPairs[] = sprintf('    %s: ', $key) . ($value ? 'true' : 'false');
             }
+            
             $script .= implode(",\n", $optionPairs) . "\n";
             $script .= "});\n";
             $script .= $this->debugLog("User interaction options applied");
@@ -1086,16 +1194,17 @@ class Map extends ViewableData
      * These options need to be set during map creation, not after
      * @return string JSON-formatted options for map constructor
      */
-    public function GetMapConstructorOptions()
+    public function GetMapConstructorOptions(): string
     {
         $options = [];
         
         // Add any options that need to be set during map creation
         // Most interaction and control options are better set after creation
         
-        return !empty($options) ? ',' . json_encode($options, JSON_UNESCAPED_SLASHES) : '';
-    }   
-    public function RenderFunction()
+        return $options === [] ? '' : ',' . json_encode($options, JSON_UNESCAPED_SLASHES);
+    }
+       
+    public function RenderFunction(): string
     {
         $rendered = "";
         $Attributes = "";
@@ -1106,18 +1215,20 @@ class Map extends ViewableData
                 $Attributes .= $key.'="'.$value.'" ';
             }
         }
+        
         if($this->IsUserCentrics)
         {
             $Attributes .= 'data-usercentrics="Azure Maps" type="text/plain" ';
         }
-        if ($this->loadOnStartClass != "" || $Attributes != "") {
-            $rendered .= "<script class='$this->loadOnStartClass' $Attributes>\n";
+        
+        if ($this->loadOnStartClass != "" || $Attributes !== "") {
+            $rendered .= "<script class='$this->loadOnStartClass' {$Attributes}>\n";
         } else {
             $rendered .= "<script type='text/javascript'>\n";
         }
         
         $rendered .= "var InfoBoxCollection = [];\n";
-        $rendered .= $this->debugLog("Starting Azure Maps initialization for map ID: {$this->ID}");
+        $rendered .= $this->debugLog('Starting Azure Maps initialization for map ID: ' . $this->ID);
         
         // Function to dynamically load Azure Maps CSS
         $rendered .= "function loadAzureMapCSS() {\n";
@@ -1185,7 +1296,7 @@ class Map extends ViewableData
         return $rendered;
     }
     
-    private function RenderAzureMap()
+    private function RenderAzureMap(): string
     {
         $rendered = "";
         $rendered .= "function GetMap{$this->ID}(){\n";
@@ -1202,7 +1313,7 @@ class Map extends ViewableData
             
             " . ($this->Debug ? "console.log('Atlas library available, creating Azure Map...');\n" : "") . "
             try {
-                var $mapVariable = new atlas.Map('MapContainer{$this->ID}',{
+                var {$mapVariable} = new atlas.Map('MapContainer{$this->ID}',{
                     center:{$this->RenderLocation()}{$this->RenderZoom()}{$this->RenderMapTypeID()},
                     authOptions: {
                         authType: 'subscriptionKey',
@@ -1222,7 +1333,8 @@ class Map extends ViewableData
         $rendered .= "    showMapError('Map is taking too long to load. Please check your internet connection and try again.');\n";
         $rendered .= "}, 10000);\n"; // 10 second timeout
         
-        $rendered .= "{$mapVariable}.events.add('ready', function() {\n";
+        $rendered .= $mapVariable . '.events.add(\'ready\', function() {
+';
         $rendered .= "clearTimeout(mapReadyTimeout);\n";
         $rendered .= $this->debugLog("Map is ready! Adding content...");
         
@@ -1265,16 +1377,21 @@ class Map extends ViewableData
         return $rendered;
     }
     
-    private function GetMarkersData()
+    /**
+     * @return mixed[]
+     */
+    private function GetMarkersData(): array
     {
         $MarkersData = [];
         $iconPath = $this->IconPath;
         foreach ($this->Markers as $Marker) {
             $MarkersData[] = $Marker->GetReactData($iconPath);
         }
+        
         return $MarkersData;
     }
-    public function GetReactData()
+    
+    public function GetReactData(): array
     {
         $data = [
             "key" => $this->ID,
@@ -1287,6 +1404,7 @@ class Map extends ViewableData
         ];
         return $data;
     }
+    
     public function GetJSONReactData()
     {
         return json_encode($this->GetReactData());
@@ -1303,7 +1421,7 @@ class Map extends ViewableData
         return $this->ClusterLayer;
     }
     
-    public function getMarkers()
+    public function getMarkers(): array
     {
         return $this->Markers;
     }
@@ -1320,7 +1438,7 @@ class Map extends ViewableData
      * @param array $options Optional parameters for the search
      * @return array|null Returns polygon data or null if not found
      */
-    public function getPolygonForCoordinate($latitude, $longitude, $options = [])
+    public function getPolygonForCoordinate($latitude, $longitude, $options = []): ?array
     {
         $apiKey = SiteConfig::current_site_config()->bingAPIKey ?? '';
         
@@ -1345,10 +1463,10 @@ class Map extends ViewableData
             'query' => $latitude . ',' . $longitude
         ];
         
-        error_log("Getting address for coordinate: $latitude, $longitude");
+        error_log(sprintf('Getting address for coordinate: %s, %s', $latitude, $longitude));
         $reverseResponse = $this->makeHttpRequest($reverseGeoUrl, $reverseParams);
         if (!$reverseResponse || !isset($reverseResponse['addresses']) || empty($reverseResponse['addresses'])) {
-            error_log("Failed to get address for coordinate: $latitude, $longitude");
+            error_log(sprintf('Failed to get address for coordinate: %s, %s', $latitude, $longitude));
             return null;
         }
         
@@ -1365,6 +1483,7 @@ class Map extends ViewableData
                 $polygonData['name'] = $address['address']['municipality'];
             }
         }
+        
         // If no municipality polygon, try county/subdivision
         if (!$polygonData && isset($address['address']['countrySubdivision'])) {
             $polygonData = $this->fetchPolygonByEntity($latitude, $longitude, 'CountrySubdivision', $apiKey);
@@ -1407,7 +1526,7 @@ class Map extends ViewableData
                 error_log("Polygon data summary - Type: " . $polygonData['type'] . ", Points: " . count($polygonData['coordinates']) . ", Entity: " . $polygonData['entityType']);
             }
         } else {
-            error_log("No polygon found for coordinate: $latitude, $longitude");
+            error_log(sprintf('No polygon found for coordinate: %s, %s', $latitude, $longitude));
         }
         
         return $polygonData;
@@ -1421,7 +1540,7 @@ class Map extends ViewableData
      * @param string $apiKey Azure Maps API key
      * @return array|null Returns polygon data or null if not found
      */
-    private function fetchPolygonByEntity($latitude, $longitude, $entityType, $apiKey)
+    private function fetchPolygonByEntity($latitude, $longitude, string $entityType, $apiKey): ?array
     {
         // Step 1: First do a reverse geocoding search to get the geometry ID
         $searchUrl = "https://atlas.microsoft.com/search/address/reverse/json";
@@ -1444,7 +1563,7 @@ class Map extends ViewableData
             'returnGeometry' => 'true'
         ];
         
-        error_log("Step 1: Searching for $entityType at coordinate: $latitude, $longitude");
+        error_log(sprintf('Step 1: Searching for %s at coordinate: %s, %s', $entityType, $latitude, $longitude));
         error_log("Search URL: " . $searchUrl . "?" . http_build_query($searchParams));
         
         $searchResponse = $this->makeHttpRequest($searchUrl, $searchParams, 'GET');
@@ -1456,10 +1575,11 @@ class Map extends ViewableData
         
         // Check if we have results with geometry
         if (!isset($searchResponse['addresses']) || empty($searchResponse['addresses'])) {
-            error_log("No addresses found in reverse geocoding response for $entityType");
+            error_log('No addresses found in reverse geocoding response for ' . $entityType);
             if (isset($searchResponse['summary'])) {
                 error_log("Search summary: " . json_encode($searchResponse['summary']));
             }
+            
             return null;
         }
         
@@ -1467,13 +1587,13 @@ class Map extends ViewableData
         foreach ($searchResponse['addresses'] as $address) {
             if (isset($address['dataSources']['geometry']['id'])) {
                 $geometryId = $address['dataSources']['geometry']['id'];
-                error_log("Found geometry ID: $geometryId for $entityType");
+                error_log(sprintf('Found geometry ID: %s for %s', $geometryId, $entityType));
                 break;
             }
         }
         
         if (!$geometryId) {
-            error_log("No geometry ID found in reverse geocoding response for $entityType");
+            error_log('No geometry ID found in reverse geocoding response for ' . $entityType);
             return null;
         }
         
@@ -1486,7 +1606,7 @@ class Map extends ViewableData
             'geometries' => $geometryId
         ];
         
-        error_log("Step 2: Fetching polygon data using geometry ID: $geometryId");
+        error_log('Step 2: Fetching polygon data using geometry ID: ' . $geometryId);
         error_log("Polygon URL: " . $polygonUrl . "?" . http_build_query($polygonParams));
         
         $polygonResponse = $this->makeHttpRequest($polygonUrl, $polygonParams, 'GET');
@@ -1497,7 +1617,7 @@ class Map extends ViewableData
         
         // Check if we have the expected response structure
         if (!isset($polygonResponse['additionalData']) || empty($polygonResponse['additionalData'])) {
-            error_log("No additionalData found in polygon response for $entityType");
+            error_log('No additionalData found in polygon response for ' . $entityType);
             error_log("Response keys: " . implode(', ', array_keys($polygonResponse)));
             return null;
         }
@@ -1536,11 +1656,11 @@ class Map extends ViewableData
             error_log("Could not extract geometry data from response");
             return null;
         }
-        
+
         // Process the geometry data
         if ($geoData['type'] === 'Polygon' && isset($geoData['coordinates'])) {
-            $coordinates = $geoData['coordinates'][0]; // Get outer ring
-            
+            $coordinates = $geoData['coordinates'][0];
+            // Get outer ring
             // Convert to lat/lng format (Azure Maps returns lng/lat)
             $polygonPoints = [];
             foreach ($coordinates as $coord) {
@@ -1549,9 +1669,8 @@ class Map extends ViewableData
                     'lng' => $coord[0]
                 ];
             }
-            
-            error_log("Found $entityType polygon with " . count($polygonPoints) . " points");
-            
+
+            error_log(sprintf('Found %s polygon with ', $entityType) . count($polygonPoints) . " points");
             return [
                 'type' => 'polygon',
                 'entityType' => $entityType,
@@ -1561,11 +1680,11 @@ class Map extends ViewableData
                 'geometryId' => $geometryId
             ];
         }
-        elseif ($geoData['type'] === 'MultiPolygon' && isset($geoData['coordinates'])) {
+        
+        if ($geoData['type'] === 'MultiPolygon' && isset($geoData['coordinates'])) {
             // Handle MultiPolygon - take the largest polygon
             $largestPolygon = null;
             $maxPoints = 0;
-            
             foreach ($geoData['coordinates'] as $polygon) {
                 $coordinates = $polygon[0]; // Get outer ring
                 if (count($coordinates) > $maxPoints) {
@@ -1573,7 +1692,7 @@ class Map extends ViewableData
                     $largestPolygon = $coordinates;
                 }
             }
-            
+
             if ($largestPolygon) {
                 $polygonPoints = [];
                 foreach ($largestPolygon as $coord) {
@@ -1583,7 +1702,7 @@ class Map extends ViewableData
                     ];
                 }
                 
-                error_log("Found $entityType MultiPolygon, using largest with " . count($polygonPoints) . " points");
+                error_log(sprintf('Found %s MultiPolygon, using largest with ', $entityType) . count($polygonPoints) . " points");
                 
                 return [
                     'type' => 'multipolygon',
@@ -1596,7 +1715,7 @@ class Map extends ViewableData
             }
         }
         
-        error_log("$entityType polygon found but could not extract coordinates");
+        error_log($entityType . ' polygon found but could not extract coordinates');
         return null;
     }
     
@@ -1605,7 +1724,7 @@ class Map extends ViewableData
      * @param string $apiKey Azure Maps API key to test
      * @return array Test results with status and messages
      */
-    public function testAzureMapsConnectivity($apiKey)
+    public function testAzureMapsConnectivity($apiKey): array
     {
         $results = [
             'overall' => 'unknown',
@@ -1648,10 +1767,10 @@ class Map extends ViewableData
                     'message' => 'Search API call failed or returned no results'
                 ];
             }
-        } catch (Exception $e) {
+        } catch (Exception $exception) {
             $results['tests']['search_api'] = [
                 'status' => 'failed',
-                'message' => 'Search API error: ' . $e->getMessage()
+                'message' => 'Search API error: ' . $exception->getMessage()
             ];
         }
         
@@ -1677,10 +1796,10 @@ class Map extends ViewableData
                     'message' => 'Polygon API call failed or returned unexpected format'
                 ];
             }
-        } catch (Exception $e) {
+        } catch (Exception $exception) {
             $results['tests']['polygon_api'] = [
                 'status' => 'failed',
-                'message' => 'Polygon API error: ' . $e->getMessage()
+                'message' => 'Polygon API error: ' . $exception->getMessage()
             ];
         }
         
@@ -1707,10 +1826,10 @@ class Map extends ViewableData
                     'message' => 'Postal code search failed'
                 ];
             }
-        } catch (Exception $e) {
+        } catch (Exception $exception) {
             $results['tests']['postal_search'] = [
                 'status' => 'failed',
-                'message' => 'Postal code search error: ' . $e->getMessage()
+                'message' => 'Postal code search error: ' . $exception->getMessage()
             ];
         }
         
@@ -1719,13 +1838,13 @@ class Map extends ViewableData
         $totalTests = count($results['tests']);
         foreach ($results['tests'] as $test) {
             if ($test['status'] === 'passed') {
-                $passedTests++;
+                ++$passedTests;
             }
         }
         
         if ($passedTests === $totalTests) {
             $results['overall'] = 'passed';
-        } else if ($passedTests > 0) {
+        } elseif ($passedTests > 0) {
             $results['overall'] = 'partial';
         } else {
             $results['overall'] = 'failed';
@@ -1741,10 +1860,10 @@ class Map extends ViewableData
      * @param string $method HTTP method (GET or POST)
      * @return array|null Decoded JSON response or null on failure
      */
-    private function makeHttpRequest($url, $params = [], $method = 'GET',$debug = false)
+    private function makeHttpRequest(string $url, array $params = [], string $method = 'GET',$debug = false)
     {
         // Build query string for GET requests or URL with params
-        if ($method === 'GET' && !empty($params)) {
+        if ($method === 'GET' && $params !== []) {
             $url .= '?' . http_build_query($params);
         }
         
@@ -1771,7 +1890,7 @@ class Map extends ViewableData
         // Handle POST requests
         if ($method === 'POST') {
             curl_setopt($ch, CURLOPT_POST, true);
-            if (!empty($params)) {
+            if ($params !== []) {
                 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($params));
             }
         }
@@ -1787,14 +1906,14 @@ class Map extends ViewableData
         }
         
         // Handle cURL errors
-        if ($response === false || !empty($error)) {
-            error_log("HTTP request failed: $error");
+        if ($response === false || $error !== '' && $error !== '0') {
+            error_log('HTTP request failed: ' . $error);
             return null;
         }
         
         // Handle non-200 HTTP status codes
         if ($httpCode < 200 || $httpCode >= 300) {
-            error_log("HTTP request returned status code: $httpCode");
+            error_log('HTTP request returned status code: ' . $httpCode);
             error_log("Response: " . substr($response, 0, 500));
             return null;
         }
@@ -1816,7 +1935,7 @@ class Map extends ViewableData
      * @param string $mapVariable The map variable name
      * @return string JavaScript code to add controls
      */
-    private function AddCustomControls($mapVariable)
+    private function AddCustomControls(string $mapVariable): string
     {
         $script = "";
         
@@ -1824,28 +1943,32 @@ class Map extends ViewableData
         
         if ($this->ShowZoomButtons) {
             $script .= "// Add zoom control\n";
-            $script .= "{$mapVariable}.controls.add(new atlas.control.ZoomControl(), {\n";
+            $script .= $mapVariable . '.controls.add(new atlas.control.ZoomControl(), {
+';
             $script .= "    position: '{$this->ZoomButtonsPosition}'\n";
             $script .= "});\n";
         }
         
         if ($this->ShowCompass) {
             $script .= "// Add compass control\n";
-            $script .= "{$mapVariable}.controls.add(new atlas.control.CompassControl(), {\n";
+            $script .= $mapVariable . '.controls.add(new atlas.control.CompassControl(), {
+';
             $script .= "    position: '{$this->CompassPosition}'\n";
             $script .= "});\n";
         }
         
         if ($this->ShowPitchToggle) {
             $script .= "// Add pitch control\n";
-            $script .= "{$mapVariable}.controls.add(new atlas.control.PitchControl(), {\n";
+            $script .= $mapVariable . '.controls.add(new atlas.control.PitchControl(), {
+';
             $script .= "    position: 'bottom-left'\n";
             $script .= "});\n";
         }
         
         if ($this->ShowStylePicker) {
             $script .= "// Add style picker control\n";
-            $script .= "{$mapVariable}.controls.add(new atlas.control.StyleControl({\n";
+            $script .= $mapVariable . '.controls.add(new atlas.control.StyleControl({
+';
             $script .= "    mapStyles: ['road', 'grayscale_light', 'grayscale_dark', 'night', 'satellite', 'satellite_road_labels']\n";
             $script .= "}), {\n";
             $script .= "    position: 'top-left'\n";
@@ -1854,12 +1977,13 @@ class Map extends ViewableData
         
         if ($this->ShowFullscreenControl) {
             $script .= "// Add fullscreen control\n";
-            $script .= "{$mapVariable}.controls.add(new atlas.control.FullscreenControl(), {\n";
+            $script .= $mapVariable . '.controls.add(new atlas.control.FullscreenControl(), {
+';
             $script .= "    position: 'top-right'\n";
             $script .= "});\n";
         }
         
-        if (!empty($script)) {
+        if ($script !== '' && $script !== '0') {
             $script = "// Add map controls\n" . $script;
             $script .= $this->debugLog("Map controls added");
         }
@@ -1872,7 +1996,7 @@ class Map extends ViewableData
      * @param array $polygonData Raw polygon data from fetchPolygonByEntity
      * @return array Formatted data ready for map rendering
      */
-    private function formatPolygonForMapRendering($polygonData)
+    private function formatPolygonForMapRendering(array $polygonData): ?array
     {
         if (!$polygonData || !isset($polygonData['coordinates'])) {
             return null;
@@ -1886,7 +2010,7 @@ class Map extends ViewableData
         }
         
         // Ensure polygon is closed (first point = last point)
-        if (count($azureMapCoords) > 0) {
+        if ($azureMapCoords !== []) {
             $firstPoint = $azureMapCoords[0];
             $lastPoint = end($azureMapCoords);
             if ($firstPoint[0] !== $lastPoint[0] || $firstPoint[1] !== $lastPoint[1]) {
@@ -1918,7 +2042,7 @@ class Map extends ViewableData
      * @param string $level Administrative level (municipality, county, state, country)
      * @return string CSS color value
      */
-    private function getPolygonColorByLevel($level)
+    private function getPolygonColorByLevel($level): string
     {
         switch (strtolower($level)) {
             case 'municipality':
@@ -1939,7 +2063,7 @@ class Map extends ViewableData
      * @param string $level Administrative level (municipality, county, state, country)
      * @return string CSS color value
      */
-    private function getPolygonStrokeColorByLevel($level)
+    private function getPolygonStrokeColorByLevel($level): string
     {
         switch (strtolower($level)) {
             case 'municipality':
@@ -1962,7 +2086,7 @@ class Map extends ViewableData
      * @param array $options Optional search options
      * @return bool True if polygon was found and added, false otherwise
      */
-    public function addPolygonFromCoordinate($latitude, $longitude, $options = [])
+    public function addPolygonFromCoordinate($latitude, $longitude, $options = []): bool
     {
         $polygonData = $this->getPolygonForCoordinate($latitude, $longitude, $options);
         
@@ -2000,7 +2124,7 @@ class Map extends ViewableData
     /**
      * Clear all polygon data from the map
      */
-    public function clearPolygons()
+    public function clearPolygons(): static
     {
         $this->PolygoneData = [];
         return $this;
@@ -2023,7 +2147,7 @@ class Map extends ViewableData
      * @param string $directory Absolute path to cache directory
      * @return $this
      */
-    public function setCacheDirectory($directory)
+    public function setCacheDirectory($directory): static
     {
         $this->cacheDirectory = $directory;
         return $this;
@@ -2043,11 +2167,9 @@ class Map extends ViewableData
         $defaultCacheDir = dirname(__DIR__, 3) . '/public/AzureMapCacheFolder';
         
         // Create directory if it doesn't exist
-        if (!is_dir($defaultCacheDir)) {
-            if (!mkdir($defaultCacheDir, 0755, true)) {
-                error_log("Failed to create polygon cache directory: $defaultCacheDir");
-                return null;
-            }
+        if (!is_dir($defaultCacheDir) && !mkdir($defaultCacheDir, 0755, true)) {
+            error_log('Failed to create polygon cache directory: ' . $defaultCacheDir);
+            return null;
         }
         
         return $defaultCacheDir;
@@ -2060,13 +2182,13 @@ class Map extends ViewableData
      * @param int $precision Decimal precision for coordinates (default: 4)
      * @return string Cache key
      */
-    private function generateCacheKey($latitude, $longitude, $precision = 4)
+    private function generateCacheKey($latitude, $longitude, $precision = 4): string
     {
         // Round coordinates to reduce cache fragmentation
         $roundedLat = round($latitude, $precision);
         $roundedLng = round($longitude, $precision);
         
-        return 'polygon_' . md5("{$roundedLat},{$roundedLng}");
+        return 'polygon_' . md5(sprintf('%s,%s', $roundedLat, $roundedLng));
     }
     
     /**
@@ -2087,26 +2209,27 @@ class Map extends ViewableData
         
         if (!file_exists($cacheFile)) {
             if ($this->Debug) {
-                error_log("Polygon cache miss for coordinates: $latitude, $longitude");
+                error_log(sprintf('Polygon cache miss for coordinates: %s, %s', $latitude, $longitude));
             }
+            
             return null;
         }
         
         $cacheContent = file_get_contents($cacheFile);
         if ($cacheContent === false) {
-            error_log("Failed to read polygon cache file: $cacheFile");
+            error_log('Failed to read polygon cache file: ' . $cacheFile);
             return null;
         }
         
         $cachedData = json_decode($cacheContent, true);
         if ($cachedData === null) {
-            error_log("Failed to decode polygon cache data: $cacheFile");
+            error_log('Failed to decode polygon cache data: ' . $cacheFile);
             unlink($cacheFile);
             return null;
         }
         
         if ($this->Debug) {
-            error_log("Polygon cache hit for coordinates: $latitude, $longitude");
+            error_log(sprintf('Polygon cache hit for coordinates: %s, %s', $latitude, $longitude));
         }
         
         return $cachedData;
@@ -2119,12 +2242,13 @@ class Map extends ViewableData
      * @param array $polygonData Polygon data to cache
      * @return bool Success status
      */
-    private function savePolygonToCache($latitude, $longitude, $polygonData)
+    private function savePolygonToCache(string $latitude, $longitude, array $polygonData): bool
     {
         $cacheDir = $this->getCacheDirectory();
         if (!$cacheDir) {
             return false;
         }
+        
         $cacheKey = $this->generateCacheKey($latitude, $longitude);
         $cacheFile = $cacheDir . '/' . $cacheKey . '.json';
         
@@ -2143,12 +2267,12 @@ class Map extends ViewableData
         
         $result = file_put_contents($cacheFile, $jsonData, LOCK_EX);
         if ($result === false) {
-            error_log("Failed to write polygon cache file: $cacheFile");
+            error_log('Failed to write polygon cache file: ' . $cacheFile);
             return false;
         }
         
         if ($this->Debug) {
-            error_log("Polygon data cached for coordinates: $latitude, $longitude");
+            error_log(sprintf('Polygon data cached for coordinates: %s, %s', $latitude, $longitude));
         }
         
         return true;
@@ -2158,7 +2282,7 @@ class Map extends ViewableData
      * Clear all polygon cache files
      * @return array Results with counts of deleted files and errors
      */
-    public function clearPolygonCache()
+    public function clearPolygonCache(): array
     {
         $result = [
             'success' => false,
@@ -2183,21 +2307,21 @@ class Map extends ViewableData
         
         foreach ($files as $file) {
             if (unlink($file)) {
-                $result['deleted_files']++;
+                ++$result['deleted_files'];
             } else {
-                $result['errors']++;
-                error_log("Failed to delete cache file: $file");
+                ++$result['errors'];
+                error_log('Failed to delete cache file: ' . $file);
             }
         }
         
         $result['success'] = true;
-        $result['message'] = "Deleted {$result['deleted_files']} cache files";
+        $result['message'] = sprintf('Deleted %d cache files', $result['deleted_files']);
         
         if ($result['errors'] > 0) {
-            $result['message'] .= " with {$result['errors']} errors";
+            $result['message'] .= sprintf(' with %d errors', $result['errors']);
         }
         
-        error_log("Polygon cache cleared: {$result['message']}");
+        error_log('Polygon cache cleared: ' . $result['message']);
         
         return $result;
     }
@@ -2208,7 +2332,7 @@ class Map extends ViewableData
      * @param float $longitude Longitude coordinate
      * @return bool Success status
      */
-    public function clearPolygonCacheForCoordinate($latitude, $longitude)
+    public function clearPolygonCacheForCoordinate($latitude, $longitude): bool
     {
         $cacheDir = $this->getCacheDirectory();
         if (!$cacheDir) {
@@ -2220,12 +2344,12 @@ class Map extends ViewableData
         
         if (file_exists($cacheFile)) {
             if (unlink($cacheFile)) {
-                error_log("Cleared polygon cache for coordinates: $latitude, $longitude");
+                error_log(sprintf('Cleared polygon cache for coordinates: %s, %s', $latitude, $longitude));
                 return true;
-            } else {
-                error_log("Failed to clear polygon cache for coordinates: $latitude, $longitude");
-                return false;
             }
+
+            error_log(sprintf('Failed to clear polygon cache for coordinates: %s, %s', $latitude, $longitude));
+            return false;
         }
         
         return true; // File doesn't exist, consider it cleared
@@ -2235,7 +2359,7 @@ class Map extends ViewableData
      * Get cache statistics
      * @return array Cache statistics
      */
-    public function getPolygonCacheStats()
+    public function getPolygonCacheStats(): array
     {
         $stats = [
             'directory' => $this->getCacheDirectory(),
@@ -2290,7 +2414,7 @@ class Map extends ViewableData
      * Generate the color configuration for cluster bubbles based on custom settings
      * @return string JavaScript array expression for Azure Maps color styling
      */
-    public function getClusterColorConfiguration()
+    public function getClusterColorConfiguration(): string
     {
         $colorConfig = "[\n                    'step',\n                    ['get', 'point_count']";
         
@@ -2300,9 +2424,12 @@ class Map extends ViewableData
         } else {
             $colorConfig .= ",\n                    '#51bbd6'"; // Default fallback
         }
+
+        // Add step colors based on thresholds
+        $counter = count($this->ClusterColorSteps);
         
         // Add step colors based on thresholds
-        for ($i = 0; $i < count($this->ClusterColorSteps); $i++) {
+        for ($i = 0; $i < $counter; ++$i) {
             $step = $this->ClusterColorSteps[$i];
             $colorIndex = $i + 1;
             

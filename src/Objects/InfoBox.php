@@ -2,95 +2,114 @@
 
 namespace bingMap;
 
+use SilverStripe\Model\ModelData;
 use bingMap\MapPosition;
 use bingMap\HelperMethods;
-use SilverStripe\View\ViewableData;
 
 class InfoBox
 {
     use MapPosition;
     
     private $ID;
+    
     private $Title = null;
+    
     private $Description = null;
+    
     private $InitialVisibility = false;
+    
     private $HTMLContent = null;
-    private static $Suffix = "InfoBox";
+    
+    private static string $Suffix = "InfoBox";
 
     public function __construct()
     {
         $InitialVisibility = false;
     }
-    public static function create()
+    
+    public static function create(): InfoBox
     {
         return new InfoBox();
     }
+    
     //Will be set by Marker to make JS code more readable
-    public function SetID($ID)
+    public function SetID($ID): static
     {
         $this->ID = $ID;
         return $this;
     }
-    public function SetTitle($Title)
+    
+    public function SetTitle($Title): static
     {
         $this->Title = $Title;
         return $this;
     }
-    public function SetContent($Content)
+    
+    public function SetContent($Content): static
     {
         $this->Description = $Content;
         return $this;
     }
-    public function SetDescription($Description)
+    
+    public function SetDescription($Description): static
     {
         $this->Description = $Description;
         return $this;
     }
-    public function SetHTMLContent($HTMLContent)
+    
+    public function SetHTMLContent($HTMLContent): static
     {
         $this->HTMLContent = $HTMLContent;
         return $this;
     }
-    public function SetInitialVisibility($InitialVisibility)
+    
+    public function SetInitialVisibility($InitialVisibility): static
     {
         $this->InitialVisibility = $InitialVisibility;
         return $this;
     }
-    public function hasID($ID)
+    
+    public function hasID($ID): bool
     {
         return $this->ID == null;
     }
     
-    private function RenderTitle()
+    private function RenderTitle(): string
     {
         if($this->Title != null)
         {
-            return "title: '{$this->Title}',";
+            return sprintf("title: '%s',", $this->Title);
         }
+        
         return "";
     }
-    private function RenderDescription()
+    
+    private function RenderDescription(): string
     {
         if($this->Description != null)
         {
-            return "content: '{$this->Description}',";
+            return sprintf("content: '%s',", $this->Description);
         }
+        
         return "";
     }
-    private function RenderHTMLContent()
+    
+    private function RenderHTMLContent(): string
     {
         if($this->HTMLContent != null)
         {
             $rendered = $this->getRenderedHTMLContent();
-            return "content: '{$rendered}',";
+            return sprintf("content: '%s',", $rendered);
         }
+        
         return "";
     }
-    private function getRenderedHTMLContent()
+    
+    private function getRenderedHTMLContent(): string|array
     {
         if($this->HTMLContent != null)
         {
-            $renderer = new ViewableData();
+            $renderer = ModelData::create();
             $rendered = $renderer->customise([
                 "HTMLContent"   => $this->HTMLContent,
                 "Title" =>  $this->Title,
@@ -99,9 +118,11 @@ class InfoBox
             $rendered = HelperMethods::prepareJavascriptString($rendered);
             return $rendered;
         }
+        
         return "";
     }
-    public function RenderHTMLCloser()
+    
+    public function RenderHTMLCloser(): string
     {
         if($this->HTMLContent != null)
         {
@@ -113,17 +134,21 @@ class InfoBox
                 }
             }";
         }
+        
         return "";
     }
-    private function RenderInitialVisibility()
+    
+    private function RenderInitialVisibility(): string
     {
         if($this->InitialVisibility == true)
         {
             return "isVisible: true";
         }
+        
         return "isVisible: false";
     }
-    public function Render($mapVariable, $markerVariable)
+    
+    public function Render($mapVariable, $markerVariable): string
     {
         if($this->IsValidCoordinate())
         {
@@ -135,12 +160,15 @@ class InfoBox
             if ($this->Title) {
                 $content .= '<span class="h4 d-block">' . htmlspecialchars($this->Title, ENT_QUOTES) . '</span>';
             }
+            
             if ($this->Description) {
                 $content .= '<p>' . htmlspecialchars($this->Description, ENT_QUOTES) . '</p>';
             }
+            
             if ($this->HTMLContent) {
                 $content .= htmlspecialchars($this->getRenderedHTMLContent(), ENT_QUOTES);
             }
+            
             $content .= '</div>';
             
             // Use json_encode to properly escape the content for JavaScript
@@ -159,39 +187,46 @@ class InfoBox
             } else {
                 // For HtmlMarkers, use the global popup management system
                 $rendered .= "// Use global popup management for HtmlMarkers
-                {$mapVariable}.events.add('click', $markerVariable, function() {
-                    showPopup($contentJson, {$this->GetLocationVariable($this->ID,self::$Suffix)});
+                {$mapVariable}.events.add('click', {$markerVariable}, function() {
+                    showPopup({$contentJson}, {$this->GetLocationVariable($this->ID,self::$Suffix)});
                 });
                 ";
             }
             
             return $rendered;
         }
+        
         return "console.log('Skipping Invalid Coordinates');";
         
     }
-    public function GetContent()
+    
+    public function GetContent(): string
     {
         $content = "<div style='padding:10px'>";
         if ($this->Title) {
             $content .= '<span class="h4 d-block">' . htmlspecialchars($this->Title) . "</span>";
         }
+        
         if ($this->Description) {
             $content .= "<p>" . htmlspecialchars($this->Description) . "</p>";
         }
+        
         if ($this->HTMLContent) {
             $content .= $this->getRenderedHTMLContent();
         }
+        
         $content .= "</div>";
         return $content;
     }
-    public function GetReactData()
+    
+    public function GetReactData(): ?array
     {
         //we don't want to return false data that has no position to prevent map from not working at all
         if(!$this->IsValidCoordinate())
         {
             return null;
         }
+        
         return [
             "key" => $this->ID,
             "title" => $this->Title,
