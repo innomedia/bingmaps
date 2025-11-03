@@ -6,46 +6,56 @@ class Marker
 {
     use MapPosition;
     private $ID;
+    
     private $InfoBox = null;
+    
     private $IconPath = null;
+    
     private $Base64Icon = null;
+    
     private $IconVariable = null;
+    
     private $PostalCode = null;
 
-    private static $Suffix = "Marker";
+    private static string $Suffix = "Marker";
 
     public function __construct($ID)
     {
         $this->ID = $ID;
     }
-    public static function create($ID)
+    
+    public static function create($ID): Marker
     {
         return new Marker($ID);
     }
-    public function SetInfoBox($InfoBox)
+    
+    public function SetInfoBox($InfoBox): static
     {
         $InfoBox->SetID($this->ID);
         $this->InfoBox = $InfoBox;
         return $this;
     }
-    public function SetIconURL($IconPath)
+    
+    public function SetIconURL($IconPath): static
     {
         $this->IconPath = $IconPath;
         return $this;
     }
-    public function SetBase64Icon($Base64)
+    
+    public function SetBase64Icon($Base64): static
     {
         $this->Base64Icon = $Base64;
         return $this;
     }
+    
     //Used if Map Defines Icon
-    public function SetIconVariable()
+    public function SetIconVariable(): static
     {
         $this->IconVariable = Map::GetIconVariable();
         return $this;
     }
     
-    public function SetPostalCode($postalCode)
+    public function SetPostalCode($postalCode): static
     {
         $this->PostalCode = $postalCode;
         return $this;
@@ -56,9 +66,9 @@ class Marker
         return $this->PostalCode;
     }
     
-    public function GetMarkerVariable()
+    public function GetMarkerVariable(): string
     {
-        return "marker$this->ID";
+        return 'marker' . $this->ID;
     }
     
     public function GetInfoBox()
@@ -66,43 +76,49 @@ class Marker
         return $this->InfoBox;
     }
     
-    public function HasInfoBox()
+    public function HasInfoBox(): bool
     {
         return $this->InfoBox !== null;
     }
     
-    private function RenderIcon()
+    private function RenderIcon(): string
     {
         if ($this->IconPath != null) {
-            return "{iconOptions: {image: '$this->IconPath'}}";
+            return sprintf("{iconOptions: {image: '%s'}}", $this->IconPath);
         }
+        
         if ($this->Base64Icon != null) {
-            return "{iconOptions: {image: '$this->Base64Icon'}}";
+            return sprintf("{iconOptions: {image: '%s'}}", $this->Base64Icon);
         }
+        
         if ($this->IconVariable != null) {
-            return "{iconOptions: {image: $this->IconVariable}}";
+            return sprintf('{iconOptions: {image: %s}}', $this->IconVariable);
         }
 
         return "{}";
     }
+    
     public function RenderInfoBoxClosingFunction()
     {
         if ($this->InfoBox != null) {
             return $this->InfoBox->RenderHTMLCloser();
         }
+        
         return "";
     }
-    public function Render($mapVariable,$ClusterEnabled)
+    
+    public function Render($mapVariable,$ClusterEnabled): string
     {
         if ($this->InfoBox != null && !$this->InfoBox->HasPosition()) {
             $this->InfoBox->SetPosition($this->GetPosition());
         }
+        
         $rendered = "";
         $rendered .= $this->RenderLocationVariable($this->ID, self::$Suffix) . "\n";
         
         // Create Point feature for datasource
         $rendered .= "var point$this->ID = new atlas.data.Feature(new atlas.data.Point({$this->GetLocationVariable($this->ID, self::$Suffix)}), {\n";
-        $rendered .= "    markerId: '$this->ID'";
+        $rendered .= sprintf("    markerId: '%s'", $this->ID);
         
         // Add icon properties if available
         if ($this->IconPath != null || $this->Base64Icon != null || $this->IconVariable != null) {
@@ -112,10 +128,12 @@ class Marker
             } elseif ($this->Base64Icon != null) {
                 $iconId = 'icon-' . md5($this->Base64Icon);
             } elseif ($this->IconVariable != null) {
-                $rendered .= ",\n    iconUrl: $this->IconVariable";
+                $rendered .= ',
+    iconUrl: ' . $this->IconVariable;
             }
+            
             if ($iconId !== '') {
-                $rendered .= ",\n    iconUrl: '$iconId'";
+                $rendered .= ",\n    iconUrl: '{$iconId}'";
             }
         }
         
@@ -128,7 +146,7 @@ class Marker
         //$rendered .= "console.log('Created point feature for marker $this->ID:', point$this->ID);\n";
         
         if ($this->InfoBox != null) {
-            $rendered .= $this->InfoBox->Render($mapVariable, "point$this->ID");
+            $rendered .= $this->InfoBox->Render($mapVariable, 'point' . $this->ID);
         }
         
         // Add to datasource instead of markers collection
@@ -137,19 +155,21 @@ class Marker
         
         return $rendered;
     }
-    public function RenderClusterMarker($mapVariable,$ClusterEnabled)
+    
+    public function RenderClusterMarker($mapVariable,$ClusterEnabled): array
     {
         $data = [];
 
         if ($this->InfoBox != null && !$this->InfoBox->HasPosition()) {
             $this->InfoBox->SetPosition($this->GetPosition());
         }
+        
         $rendered = "";
         $rendered .= $this->RenderLocationVariable($this->ID, self::$Suffix) . "\n";
         
         // For clustering, we create a Point feature for the datasource
         $rendered .= "var point$this->ID = new atlas.data.Feature(new atlas.data.Point({$this->GetLocationVariable($this->ID, self::$Suffix)}), {\n";
-        $rendered .= "    markerId: '$this->ID'";
+        $rendered .= sprintf("    markerId: '%s'", $this->ID);
         
         // Add icon properties if available
         if ($this->IconPath != null || $this->Base64Icon != null || $this->IconVariable != null) {
@@ -159,10 +179,12 @@ class Marker
             } elseif ($this->Base64Icon != null) {
                 $iconId = 'icon-' . md5($this->Base64Icon);
             } elseif ($this->IconVariable != null) {
-                $rendered .= ",\n    iconUrl: $this->IconVariable";
+                $rendered .= ',
+    iconUrl: ' . $this->IconVariable;
             }
+            
             if ($iconId !== '') {
-                $rendered .= ",\n    iconUrl: '$iconId'";
+                $rendered .= ",\n    iconUrl: '{$iconId}'";
             }
         }
         
@@ -170,34 +192,39 @@ class Marker
             $content = $this->InfoBox->GetContent();
             $rendered .= ",\n    popupContent: " . json_encode($content);
         }
+        
         $rendered .= "\n});\n";
         
         if ($this->InfoBox != null) {
-            $rendered .= $this->InfoBox->Render($mapVariable, "point$this->ID");
+            $rendered .= $this->InfoBox->Render($mapVariable, 'point' . $this->ID);
         }
         
         // Don't add to datasource here - clustering handles this differently
         // The point will be added to clusterPoints array in Map.php
         
         $data["rendered"] = $rendered;
-        $data["pushpinvariable"] = "point$this->ID";
+        $data["pushpinvariable"] = 'point' . $this->ID;
 
         return $data;
     }
+    
     private function GetInfoBoxData()
     {
         return $this->InfoBox->GetReactData();
     }
-    public function GetReactData($iconPath = "")
+    
+    public function GetReactData($iconPath = ""): ?array
     {
         if (!$this->IsValidCoordinate()) {
             return null;
         }
+        
         $icon = $this->IconPath;
         if($icon == "")
         {
             $icon = $iconPath;
         }
+        
         $data = [
             "key" => $this->ID,
             "icon" => $icon,
@@ -207,8 +234,10 @@ class Marker
         {
             $data["infobox"] = $this->GetInfoBoxData();
         }
+        
         return $data;
     }
+    
     public function GetIconPath()
     {
         return $this->IconPath;
@@ -233,6 +262,7 @@ class Marker
         if ($this->InfoBox && method_exists($this->InfoBox, 'getTitle')) {
             return $this->InfoBox->getTitle();
         }
+        
         return null;
     }
 }
