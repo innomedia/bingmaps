@@ -9,7 +9,7 @@ $Script.RAW
         function showCookieConsentWarning() {
             var container = document.getElementById('MapContainer{$ID}');
             if (container) {
-                container.innerHTML = '<div style="padding: 20px; text-align: center; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; color: #856404;">' +
+                container.innerHTML = '<div class="cookie__hint" style="padding: 20px; text-align: center; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; color: #856404;">' +
                                       '<div style="font-size: 18px; margin-bottom: 10px;">🍪</div>' +
                                       '<strong><%t bingMap.COOKIE_CONSENT_REQUIRED "Cookie consent required" %></strong><br>' +
                                       '<%t bingMap.COOKIE_CONSENT_MESSAGE "To display the map, please accept cookies in the cookie settings. The map requires Azure Maps cookies to function properly." %>' +
