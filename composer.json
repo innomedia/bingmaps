@@ -18,7 +18,8 @@
   },
   "extra": {
     "expose": [
-      "client/js/react"
+      "client/js/react",
+      "client/css"
     ],
     "project-files-installed": [
       ".htaccess",

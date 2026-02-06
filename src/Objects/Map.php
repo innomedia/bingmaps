@@ -6,6 +6,7 @@ use SilverStripe\Model\ModelData;
 use bingMap\MapPosition;
 use SilverStripe\Dev\Debug;
 use SilverStripe\SiteConfig\SiteConfig;
+use SilverStripe\View\Requirements;
 
 /**
  * Azure Maps integration class for SilverStripe
@@ -1231,7 +1232,8 @@ class Map extends ModelData
         $rendered .= $this->debugLog('Starting Azure Maps initialization for map ID: ' . $this->ID);
         
         // Function to dynamically load Azure Maps CSS
-        $rendered .= "function loadAzureMapCSS() {\n";
+        Requirements::css('innomedia/bingmaps:client/css/azure-maps.min.css');
+        /*$rendered .= "function loadAzureMapCSS() {\n";
         $rendered .= "    // Check if CSS is already loaded\n";
         $rendered .= "    var existingLink = document.querySelector('link[href*=\"atlas.min.css\"]');\n";
         $rendered .= "    if (!existingLink) {\n";
@@ -1246,7 +1248,7 @@ class Map extends ModelData
         $rendered .= "\n";
         $rendered .= "// Load CSS immediately\n";
         $rendered .= "loadAzureMapCSS();\n";
-        $rendered .= "\n";
+        $rendered .= "\n";*/
         
         // WebGL detection function
         $rendered .= "function checkWebGLSupport() {\n";
